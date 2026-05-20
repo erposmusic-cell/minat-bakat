@@ -11,6 +11,10 @@ import {
   fetchSiswa,
   insertSiswa,
   updateKelasSiswa,
+  fetchSoal,
+  insertSoal,
+  updateSoal,
+  deleteSoal,
 } from "./supabaseClient";
 
 // ══════════════════════════════════════════
@@ -407,25 +411,29 @@ export default function App() {
   const [setupDone, setSetupDone] = useState(false);
   const [dbLoading, setDbLoading] = useState(false);
   const [dbError, setDbError]     = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [shuffled, setShuffled]   = useState([]);
 
   // ── Load data dari Supabase saat pertama kali masuk sebagai panitia ──
   const loadAllData = useCallback(async () => {
-    setDbLoading(true); setDbError(null);
-    try {
-      const [kelasData, targetData, siswaData] = await Promise.all([
-        fetchKelas(),
-        fetchTarget(),
-        fetchSiswa(),
-      ]);
-      setKelas(kelasData.length > 0 ? kelasData : DEFAULT_KELAS);
-      setTarget(targetData);
-      setDaftar(siswaData);
-      setSetupDone(true);
-    } catch(e) {
-      setDbError("Gagal memuat data: " + e.message);
-    }
-    setDbLoading(false);
-  }, []);
+  setDbLoading(true); setDbError(null);
+  try {
+    const [kelasData, targetData, siswaData, soalData] = await Promise.all([
+      fetchKelas(),
+      fetchTarget(),
+      fetchSiswa(),
+      fetchSoal(),
+    ]);
+    setKelas(kelasData.length > 0 ? kelasData : DEFAULT_KELAS);
+    setTarget(targetData);
+    setDaftar(siswaData);
+    setQuestions(soalData.length > 0 ? soalData : QUESTIONS);
+    setSetupDone(true);
+  } catch(e) {
+    setDbError("Gagal memuat data: " + e.message);
+  }
+  setDbLoading(false);
+}, []);
 
   // ── Load saat login sebagai panitia ──
   useEffect(() => {
@@ -561,8 +569,25 @@ export default function App() {
       <Topbar auth={auth} phase={phase} setPhase={setPhase} setAuth={setAuth} daftar={daftar} tab={tab} setTab={setTab}/>
       <main style={S.main}>
         {phase==="landing"   && <Landing onMulai={()=>setPhase("form")} />}
-        {phase==="form"      && <FormSiswa siswa={formSiswa} onChange={setFormSiswa} onLanjut={()=>{setCurrent(0);setAnswers({});setPhase("asesmen");}}/>}
-        {phase==="asesmen"   && <Asesmen questions={QUESTIONS} current={current} answers={answers} animIn={animIn} onAnswer={handleAnswer} onPrev={()=>setCurrent(c=>Math.max(0,c-1))} onSelesai={handleSelesai}/>}
+        {phase==="form"      && <FormSiswa siswa={formSiswa} onChange={setFormSiswa} onLanjut={() => {
+  setCurrent(0);
+  setAnswers({});
+  // Acak soal setiap siswa — anti nyontek!
+  const q = questions.length > 0 ? questions : QUESTIONS;
+  setShuffled([...q].sort(() => Math.random() - 0.5));
+  setPhase("asesmen");
+}}
+        {phase === "asesmen" && (
+  <Asesmen
+    questions={shuffled.length > 0 ? shuffled : QUESTIONS}
+    current={current}
+    answers={answers}
+    animIn={animIn}
+    onAnswer={handleAnswer}
+    onPrev={() => setCurrent(c => Math.max(0, c - 1))}
+    onSelesai={handleSelesai}
+  />
+)}
         {phase==="result"    && viewSiswa && <Hasil siswa={viewSiswa} onBaru={resetAsesmen} onDaftar={()=>{setPhase("dashboard");setTab("data");}} auth={auth}/>}
         {phase==="dashboard" && auth.role==="panitia" && (
           <Dashboard
@@ -659,6 +684,7 @@ function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab}) {
             <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="dashboard"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("dashboard");}}>Dashboard</button>
             <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="kelas"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("kelas");}}>🏫 Kelas</button>
             <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="data"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("data");}}>Data ({daftar.length})</button>
+            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="soal"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("soal");}}>📝 Soal ({questions.length})</button>
           </>}
           <button style={S.navBtn} onClick={()=>setPhase("landing")}>+ Asesmen</button>
           <button style={{...S.navBtn,background:"#1E293B"}} onClick={()=>setAuth(null)}>Keluar</button>
@@ -1066,6 +1092,14 @@ function Hasil({siswa,onBaru,onDaftar,auth}) {
 // ══════════════════════════════════════════
 function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,onDetail,onBaru,onExport,onSetupUlang,onSaveKelas,onDeleteKelas,onUpdateKelasSiswa,onRefresh,dbLoading}) {
   if(tab==="data")  return <DaftarSiswa daftar={daftar} kelas={kelas} onDetail={onDetail} onBaru={onBaru} onExport={onExport} onUpdateKelasSiswa={onUpdateKelasSiswa}/>;
+  if(tab==="soal") return (
+  <ManajemenSoal
+    soal={questions}
+    onAdd={async (s) => { await insertSoal(s); await loadAllData(); }}
+    onUpdate={async (id, s) => { await updateSoal(id, s); await loadAllData(); }}
+    onDelete={async (id) => { await deleteSoal(id); await loadAllData(); }}
+  />
+);      
   if(tab==="kelas") return <ManajemenKelas kelas={kelas} daftar={daftar} setDaftar={setDaftar} target={target} onSaveKelas={onSaveKelas} onDeleteKelas={onDeleteKelas} dbLoading={dbLoading}/>;
 
   const counts={}; CAT.forEach(c=>counts[c.id]=0);
@@ -1442,7 +1476,165 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa})
     </div>
   );
 }
+// ══════════════════════════════════════════
+// MANAJEMEN SOAL
+// ══════════════════════════════════════════
+function ManajemenSoal({ soal, onAdd, onUpdate, onDelete }) {
+  const [fCat, setFCat]       = useState("all");
+  const [editId, setEditId]   = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [showAdd, setShowAdd] = useState(false);
+  const [newSoal, setNewSoal] = useState({ cat: "logika", grp: "", text: "" });
+  const [loading, setLoading] = useState(false);
 
+  const filtered = soal.filter(s => fCat === "all" || s.cat === fCat);
+
+  async function handleUpdate() {
+    setLoading(true);
+    await onUpdate(editId, editForm);
+    setEditId(null);
+    setLoading(false);
+  }
+
+  async function handleAdd() {
+    if (!newSoal.text || !newSoal.grp) return;
+    setLoading(true);
+    await onAdd(newSoal);
+    setNewSoal({ cat: "logika", grp: "", text: "" });
+    setShowAdd(false);
+    setLoading(false);
+  }
+
+  async function handleDelete(id) {
+    if (!window.confirm("Hapus soal ini?")) return;
+    setLoading(true);
+    await onDelete(id);
+    setLoading(false);
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <h2 style={S.cardTitle}>📝 Manajemen Bank Soal</h2>
+          <p style={{ color: "#475569", fontSize: 13, margin: 0 }}>{soal.length} soal aktif · diacak otomatis setiap asesmen</p>
+        </div>
+        <button style={S.cta} onClick={() => setShowAdd(!showAdd)}>+ Tambah Soal</button>
+      </div>
+
+      {/* Filter Kategori */}
+      <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+        <button style={{ ...S.ghost, ...(fCat === "all" ? S.navAct : {}) }} onClick={() => setFCat("all")}>Semua ({soal.length})</button>
+        {CAT.map(c => (
+          <button key={c.id} style={{ ...S.ghost, ...(fCat === c.id ? { background: c.color + "22", color: c.color, borderColor: c.color + "55" } : {}) }}
+            onClick={() => setFCat(c.id)}>
+            {c.icon} {c.label} ({soal.filter(s => s.cat === c.id).length})
+          </button>
+        ))}
+      </div>
+
+      {/* Form Tambah Soal */}
+      {showAdd && (
+        <div style={{ ...S.card, borderColor: "#3B82F655" }}>
+          <h3 style={S.cardTitle}>Tambah Soal Baru</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11, marginTop: 12 }}>
+            <div style={S.fg}>
+              <label style={S.lbl}>Kategori</label>
+              <select style={S.inp} value={newSoal.cat} onChange={e => setNewSoal({ ...newSoal, cat: e.target.value })}>
+                {CAT.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+              </select>
+            </div>
+            <div style={S.fg}>
+              <label style={S.lbl}>Kelompok/Topik</label>
+              <input style={S.inp} value={newSoal.grp} onChange={e => setNewSoal({ ...newSoal, grp: e.target.value })} placeholder="Contoh: Penalaran" />
+            </div>
+          </div>
+          <div style={S.fg}>
+            <label style={S.lbl}>Teks Soal</label>
+            <textarea style={{ ...S.inp, minHeight: 90, resize: "vertical" }}
+              value={newSoal.text}
+              onChange={e => setNewSoal({ ...newSoal, text: e.target.value })}
+              placeholder="Tulis pernyataan soal di sini..." />
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={{ ...S.cta, opacity: loading ? 0.6 : 1 }} onClick={handleAdd} disabled={loading || !newSoal.text || !newSoal.grp}>
+              {loading ? "Menyimpan..." : "✅ Tambah Soal"}
+            </button>
+            <button style={S.ghost} onClick={() => setShowAdd(false)}>Batal</button>
+          </div>
+        </div>
+      )}
+
+      {/* Daftar Soal */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {filtered.map((s, i) => {
+          const cat = CAT.find(c => c.id === s.cat);
+          const isEd = editId === s.id;
+          return (
+            <div key={s.id} style={{ background: "#0F172A", border: "1px solid " + (cat?.color || "#334155") + "33", borderRadius: 12, padding: 14 }}>
+              {isEd ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div style={S.fg}>
+                      <label style={S.lbl}>Kategori</label>
+                      <select style={S.inp} value={editForm.cat} onChange={e => setEditForm({ ...editForm, cat: e.target.value })}>
+                        {CAT.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+                      </select>
+                    </div>
+                    <div style={S.fg}>
+                      <label style={S.lbl}>Kelompok</label>
+                      <input style={S.inp} value={editForm.grp} onChange={e => setEditForm({ ...editForm, grp: e.target.value })} />
+                    </div>
+                  </div>
+                  <div style={S.fg}>
+                    <label style={S.lbl}>Teks Soal</label>
+                    <textarea style={{ ...S.inp, minHeight: 80, resize: "vertical" }}
+                      value={editForm.text}
+                      onChange={e => setEditForm({ ...editForm, text: e.target.value })} />
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#94A3B8", cursor: "pointer" }}>
+                      <input type="checkbox" checked={editForm.aktif} onChange={e => setEditForm({ ...editForm, aktif: e.target.checked })} />
+                      Aktif
+                    </label>
+                    <button style={{ ...S.cta, padding: "6px 14px", fontSize: 13, opacity: loading ? 0.6 : 1 }} onClick={handleUpdate} disabled={loading}>
+                      {loading ? "..." : "✓ Simpan"}
+                    </button>
+                    <button style={{ ...S.ghost, padding: "6px 12px", fontSize: 13 }} onClick={() => setEditId(null)}>Batal</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                  <div style={{ minWidth: 28, height: 28, borderRadius: 8, background: cat?.color + "22", color: cat?.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>
+                    {cat?.icon}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", gap: 6, marginBottom: 5, flexWrap: "wrap" }}>
+                      <span style={{ background: cat?.color + "22", color: cat?.color, borderRadius: 20, padding: "1px 9px", fontSize: 11, fontWeight: 700 }}>{cat?.label}</span>
+                      <span style={{ background: "#1E293B", color: "#475569", borderRadius: 20, padding: "1px 9px", fontSize: 11 }}>{s.grp}</span>
+                      <span style={{ fontSize: 11, color: "#334155" }}>#{i + 1}</span>
+                    </div>
+                    <p style={{ color: "#CBD5E1", fontSize: 13, lineHeight: 1.6, margin: 0 }}>{s.text}</p>
+                  </div>
+                  <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
+                    <button style={{ ...S.ghost, padding: "4px 10px", fontSize: 12 }}
+                      onClick={() => { setEditId(s.id); setEditForm({ cat: s.cat, grp: s.grp, text: s.text, aktif: s.aktif }); }}>
+                      ✏️
+                    </button>
+                    <button style={{ ...S.ghost, padding: "4px 9px", fontSize: 12, color: "#EF4444", borderColor: "#EF444433" }}
+                      onClick={() => handleDelete(s.id)}>
+                      🗑
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 // ══════════════════════════════════════════
 // STYLES
 // ══════════════════════════════════════════
