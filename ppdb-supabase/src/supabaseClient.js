@@ -131,7 +131,52 @@ function dbRowToSiswa(row) {
       : [{ id: "logika", pct: 0, label: "Belum Ada", icon: "❓", color: "#94A3B8" }], // ✅ fallback
   };
 }
+// ── Helper: ambil soal aktif ──────────────────────────
+export async function fetchSoal() {
+  const { data, error } = await supabase
+    .from("soal")
+    .select("*")
+    .eq("aktif", true)
+    .order("kategori")
+    .order("urutan");
+  if (error) throw error;
+  return data.map(row => ({
+    id:    row.id,
+    cat:   row.kategori,
+    grp:   row.kelompok,
+    text:  row.teks,
+    aktif: row.aktif,
+  }));
+}
 
+// ── Helper: tambah soal ───────────────────────────────
+export async function insertSoal(soal) {
+  const { error } = await supabase.from("soal").insert({
+    kategori: soal.cat,
+    kelompok: soal.grp,
+    teks:     soal.text,
+    urutan:   soal.urutan || 0,
+    aktif:    true,
+  });
+  if (error) throw error;
+}
+
+// ── Helper: update soal ───────────────────────────────
+export async function updateSoal(id, soal) {
+  const { error } = await supabase.from("soal").update({
+    kategori: soal.cat,
+    kelompok: soal.grp,
+    teks:     soal.text,
+    aktif:    soal.aktif,
+  }).eq("id", id);
+  if (error) throw error;
+}
+
+// ── Helper: hapus soal ────────────────────────────────
+export async function deleteSoal(id) {
+  const { error } = await supabase.from("soal").delete().eq("id", id);
+  if (error) throw error;
+}
 // ── Konversi: objek aplikasi → baris DB ──────────────
 function siswaToDbRow(s) {
   return {
