@@ -591,9 +591,10 @@ export default function App() {
         {phase ==="result"    && viewSiswa && <Hasil siswa={viewSiswa} onBaru={resetAsesmen} onDaftar={()=>{setPhase("dashboard");setTab("data");}} auth={auth}/>}
         {phase ==="dashboard" && auth.role==="panitia" && (
           <Dashboard
-            daftar={daftar} setDaftar={setDaftar}
-            kelas={kelas} target={target}
-            tab={tab} setTab={setTab}
+  daftar={daftar} setDaftar={setDaftar}
+  kelas={kelas} target={target}
+  tab={tab} setTab={setTab}
+  questions={questions}
             onDetail={s=>{setViewSiswa(s);setPhase("result");}}
             onBaru={()=>setPhase("landing")}
             onExport={()=>doExcelExport(daftar,kelas)}
@@ -1090,7 +1091,7 @@ function Hasil({siswa,onBaru,onDaftar,auth}) {
 // ══════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════
-function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,onDetail,onBaru,onExport,onSetupUlang,onSaveKelas,onDeleteKelas,onUpdateKelasSiswa,onRefresh,dbLoading}) {
+function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,onDetail,onBaru,onExport,onSetupUlang,onSaveKelas,onDeleteKelas,onUpdateKelasSiswa,onRefresh,dbLoading}) {
   if(tab==="data")  return <DaftarSiswa daftar={daftar} kelas={kelas} onDetail={onDetail} onBaru={onBaru} onExport={onExport} onUpdateKelasSiswa={onUpdateKelasSiswa}/>;
   if(tab==="soal") return (
   <ManajemenSoal
