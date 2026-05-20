@@ -119,14 +119,16 @@ function dbRowToSiswa(row) {
     kelasNama:       row.kelas_nama,
     narasi:          row.narasi,
     scores: {
-      logika:    row.skor_logika,
-      bahasa:    row.skor_bahasa,
-      sains:     row.skor_sains,
-      seni:      row.skor_seni,
-      sosial:    row.skor_sosial,
-      olahraga:  row.skor_olahraga,
+      logika:    row.skor_logika    || 0,
+      bahasa:    row.skor_bahasa    || 0,
+      sains:     row.skor_sains     || 0,
+      seni:      row.skor_seni      || 0,
+      sosial:    row.skor_sosial    || 0,
+      olahraga:  row.skor_olahraga  || 0,
     },
-    top: row.top_bakat || [],
+    top: Array.isArray(row.top_bakat) && row.top_bakat.length > 0
+      ? row.top_bakat
+      : [{ id: "logika", pct: 0, label: "Belum Ada", icon: "❓", color: "#94A3B8" }], // ✅ fallback
   };
 }
 
