@@ -60,8 +60,9 @@ export async function fetchTarget() {
     .from("target_penerimaan")
     .select("*")
     .eq("id", 1)
-    .single();
+    .maybeSingle(); // ✅ diganti dari .single() ke .maybeSingle()
   if (error) throw error;
+  if (!data) return { min: 0, max: 0 }; // ✅ fallback jika data kosong
   return { min: data.min, max: data.max };
 }
 
@@ -80,7 +81,6 @@ export async function fetchSiswa() {
     .select("*")
     .order("created_at", { ascending: false });
   if (error) throw error;
-  // Normalisasi ke format yang dipakai aplikasi
   return data.map(dbRowToSiswa);
 }
 
