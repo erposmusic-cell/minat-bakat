@@ -12,7 +12,6 @@ import {
   insertSiswa,
   updateKelasSiswa,
 } from "./supabaseClient";
-import * as XLSX from "xlsx";
 
 // ══════════════════════════════════════════
 // KONSTANTA
