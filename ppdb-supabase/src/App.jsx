@@ -550,7 +550,7 @@ export default function App() {
   if (auth.role ==="panitia" && phase ==="dashboard" && !setupDone) {
     return (
       <div style={S.root}>
-        <Topbar auth={auth} phase={phase} setPhase={setPhase} setAuth={setAuth} daftar={daftar} tab={tab} setTab={setTab}/>
+        <Topbar auth={auth} phase={phase} setPhase={setPhase} setAuth={setAuth} daftar={daftar} tab={tab} setTab={setTab} questions={questions}/>
         <main style={S.main}>
           <SetupWizard
             kelas={kelas} target={target}
@@ -566,7 +566,7 @@ export default function App() {
 
   return (
     <div style={S.root}>
-      <Topbar auth={auth} phase={phase} setPhase={setPhase} setAuth={setAuth} daftar={daftar} tab={tab} setTab={setTab}/>
+      <Topbar auth={auth} phase={phase} setPhase={setPhase} setAuth={setAuth} daftar={daftar} tab={tab} setTab={setTab} questions={questions}/>
       <main style={S.main}>
         {phase ==="landing"   && <Landing onMulai={()=>setPhase("form")} />}
         {phase === "form" && <FormSiswa siswa={formSiswa} onChange={setFormSiswa} onLanjut={() => {
@@ -667,7 +667,7 @@ function LoginPage({onLogin}) {
 // ══════════════════════════════════════════
 // TOPBAR
 // ══════════════════════════════════════════
-function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab}) {
+function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab,questions}) {
   return (
     <header style={S.header}>
       <div style={S.headerInner}>
