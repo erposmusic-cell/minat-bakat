@@ -442,28 +442,28 @@ export default function App() {
   }
 
   async function handleSelesai() {
-    const scores   = calcScores(answers);
-    const top      = getTop(scores);
-    const kelasId  = autoAssign(top[0], daftar, kelas);
-    const kelasNama = kelas.find(k=>k.id===kelasId)?.nama||null;
-    const narasi   = generateNarasi(formSiswa.nama, scores, top);
-    const rec = {
-      id: Date.now(), ...formSiswa, scores, top, kelasId, kelasNama,
-      tanggalAsesmen: new Date().toLocaleDateString("id-ID",{dateStyle:"long"}),
-      narasi,
-    };
-    // Simpan ke state lokal dulu (langsung tampil)
-    setDaftar(prev=>[...prev, rec]);
-    setViewSiswa(rec);
-    setPhase("result");
-    // Kemudian simpan ke Supabase (background)
-    try {
-      await insertSiswa(rec);
-    } catch(e) {
-      console.error("Gagal simpan ke Supabase:", e.message);
-      // Tidak blok UI — data sudah ada di state lokal
-    }
+  const scores    = calcScores(answers);
+  const top       = getTop(scores);
+  const kelasId   = autoAssign(top[0], daftar, kelas);
+  const kelasNama = kelas.find(k => k.id === kelasId)?.nama || null;
+  const narasi    = generateNarasi(formSiswa.nama, scores, top);
+
+  const rec = {
+    ...formSiswa, scores, top, kelasId, kelasNama,
+    tanggalAsesmen: new Date().toLocaleDateString("id-ID", { dateStyle: "long" }),
+    narasi,
+  };
+
+  setViewSiswa(rec);
+  setPhase("result");
+
+  try {
+    await insertSiswa(rec);
+    if (auth?.role === "panitia") await loadAllData();
+  } catch(e) {
+    console.error("Gagal simpan ke Supabase:", e.message);
   }
+}
 
   async function handleSaveKelas(kelasArr) {
     setDbLoading(true);
