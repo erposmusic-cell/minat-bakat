@@ -577,7 +577,7 @@ export default function App() {
   setShuffled([...q].sort(() => Math.random() - 0.5));
   setPhase("asesmen");
 }}
-        {phase === "asesmen" && (
+        {phase=== "asesmen" && (
   <Asesmen
     questions={shuffled.length > 0 ? shuffled : QUESTIONS}
     current={current}
