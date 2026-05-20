@@ -547,7 +547,7 @@ export default function App() {
     );
   }
 
-  if (auth.role==="panitia" && phase==="dashboard" && !setupDone) {
+  if (auth.role ==="panitia" && phase ==="dashboard" && !setupDone) {
     return (
       <div style={S.root}>
         <Topbar auth={auth} phase={phase} setPhase={setPhase} setAuth={setAuth} daftar={daftar} tab={tab} setTab={setTab}/>
@@ -568,8 +568,8 @@ export default function App() {
     <div style={S.root}>
       <Topbar auth={auth} phase={phase} setPhase={setPhase} setAuth={setAuth} daftar={daftar} tab={tab} setTab={setTab}/>
       <main style={S.main}>
-        {phase==="landing"   && <Landing onMulai={()=>setPhase("form")} />}
-        {phase==="form"      && <FormSiswa siswa={formSiswa} onChange={setFormSiswa} onLanjut={() => {
+        {phase ==="landing"   && <Landing onMulai={()=>setPhase("form")} />}
+        {phase ==="form"      && <FormSiswa siswa={formSiswa} onChange={setFormSiswa} onLanjut={() => {
   setCurrent(0);
   setAnswers({});
   // Acak soal setiap siswa — anti nyontek!
@@ -577,7 +577,7 @@ export default function App() {
   setShuffled([...q].sort(() => Math.random() - 0.5));
   setPhase("asesmen");
 }}
-        {phase==="asesmen" && (
+        {phase ==="asesmen" && (
   <Asesmen
     questions={shuffled.length > 0 ? shuffled : QUESTIONS}
     current={current}
@@ -588,8 +588,8 @@ export default function App() {
     onSelesai={handleSelesai}
   />
 )}
-        {phase==="result"    && viewSiswa && <Hasil siswa={viewSiswa} onBaru={resetAsesmen} onDaftar={()=>{setPhase("dashboard");setTab("data");}} auth={auth}/>}
-        {phase==="dashboard" && auth.role==="panitia" && (
+        {phase ==="result"    && viewSiswa && <Hasil siswa={viewSiswa} onBaru={resetAsesmen} onDaftar={()=>{setPhase("dashboard");setTab("data");}} auth={auth}/>}
+        {phase ==="dashboard" && auth.role==="panitia" && (
           <Dashboard
             daftar={daftar} setDaftar={setDaftar}
             kelas={kelas} target={target}
