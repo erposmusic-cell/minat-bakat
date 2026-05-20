@@ -133,7 +133,6 @@ function dbRowToSiswa(row) {
 // ── Konversi: objek aplikasi → baris DB ──────────────
 function siswaToDbRow(s) {
   return {
-    id:               s.id,
     nama:             s.nama,
     nisn:             s.nisn,
     sekolah:          s.sekolah,
