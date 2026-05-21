@@ -16,6 +16,8 @@ import {
   updateSoal,
   deleteSoal,
 } from "./supabaseClient";
+import LoginPage from "./LoginPage";
+import OwnerDashboard from "./OwnerDashboard";
 
 // ══════════════════════════════════════════
 // KONSTANTA
@@ -471,10 +473,15 @@ export default function App() {
   }
 
   if (!auth) return (
-    <LoginPage onLogin={async (role, userData) => {
+    <LoginPage onLogin={(role, userData) => {
       setAuth({role, ...userData});
       setPhase(role==="panitia"?"dashboard":"landing");
     }}/>
+  );
+
+  // Owner Dashboard
+  if (auth.role === "owner") return (
+    <OwnerDashboard auth={auth} onLogout={() => setAuth(null)} />
   );
 
   if (dbLoading && auth.role==="panitia" && daftar.length===0 && !setupDone) {
@@ -559,58 +566,6 @@ export default function App() {
 
 // ══════════════════════════════════════════
 // LOGIN
-// ══════════════════════════════════════════
-function LoginPage({onLogin}) {
-  const [mode,setMode]=useState("siswa");
-  const [u,setU]=useState(""); const [p,setP]=useState("");
-  const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
-
-  async function tryLogin(){
-    setLoading(true); setErr("");
-    try {
-      const userData = await loginPanitia(u, p);
-      if (!userData) { setErr("Username atau password salah."); }
-      else { onLogin("panitia", userData); }
-    } catch(e) { setErr("Koneksi gagal: " + e.message); }
-    setLoading(false);
-  }
-
-  return (
-    <div style={S.loginRoot}>
-      <div style={{...S.card,maxWidth:420,width:"100%"}}>
-        <div style={{textAlign:"center",marginBottom:22}}>
-          <div style={{fontSize:42,color:"#3B82F6"}}>◈</div>
-          <h1 style={{fontSize:20,fontWeight:900,margin:"8px 0 4px",color:"#E2E8F0"}}>PPDB Asesmen Bakat & Minat</h1>
-          <p style={{color:"#475569",fontSize:13,margin:0}}>Sistem Penjurusan Cerdas — SMA 2025/2026</p>
-        </div>
-        <div style={S.tabRow}>
-          <button style={{...S.tabBtn,...(mode==="siswa"?S.tabAct:{})}} onClick={()=>{setMode("siswa");setErr("");}}>Siswa / Wali</button>
-          <button style={{...S.tabBtn,...(mode==="panitia"?S.tabAct:{})}} onClick={()=>{setMode("panitia");setErr("");}}>Panitia PPDB</button>
-        </div>
-        {mode==="siswa"?(
-          <div style={{textAlign:"center"}}>
-            <p style={{color:"#94A3B8",fontSize:14,marginBottom:18}}>Ikuti asesmen untuk menemukan jurusan yang tepat.</p>
-            <button style={S.cta} onClick={()=>onLogin("siswa",{})}>Mulai Asesmen →</button>
-          </div>
-        ):(
-          <div>
-            <div style={S.fg}><label style={S.lbl}>Username</label>
-              <input style={S.inp} value={u} onChange={e=>setU(e.target.value)} placeholder="Username panitia"/></div>
-            <div style={S.fg}><label style={S.lbl}>Password</label>
-              <input style={S.inp} type="password" value={p} onChange={e=>setP(e.target.value)} placeholder="Password" onKeyDown={e=>e.key==="Enter"&&tryLogin()}/></div>
-            {err&&<div style={{background:"#450A0A",color:"#F87171",borderRadius:8,padding:"8px 12px",fontSize:13,marginBottom:10}}>{err}</div>}
-            <button style={{...S.cta,width:"100%",opacity:loading?0.6:1}} onClick={tryLogin} disabled={loading}>
-              {loading?"Memverifikasi...":"Login Panitia →"}
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════
-// TOPBAR
 // ══════════════════════════════════════════
 function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab,questions}) {
   return (
