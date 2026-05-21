@@ -1235,7 +1235,7 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa})
         </div>
       ):(
         <div className="tbl-wrap" style={{background:"#0F172A"}}>
-          <table style={{width:"100%",borderCollapse:"collapse"}}
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["No","Nama","NISN","Sekolah","Bakat Utama","Skor","Kelas","Aksi"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
             <tbody>
               {filtered.map((s,i)=>{
