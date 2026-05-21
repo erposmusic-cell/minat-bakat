@@ -1,4 +1,18 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+
+// ──────────────────────────────────────────
+// RESPONSIVE HOOK
+// ──────────────────────────────────────────
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const handler = e => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isMobile;
+}
 import * as XLSX from "xlsx";
 import {
   supabase,
@@ -513,7 +527,7 @@ export default function App() {
     return (
       <div style={S.root}>
         <Topbar auth={auth} phase={phase} setPhase={setPhase} setAuth={setAuth} daftar={daftar} tab={tab} setTab={setTab} questions={questions}/>
-        <main style={S.main}>
+        <main style={S.main} className="main-resp">
           <SetupWizard kelas={kelas} target={target} onSaveKelas={handleSaveKelas} onSaveTarget={handleSaveTarget} onDone={()=>setSetupDone(true)} dbLoading={dbLoading}/>
         </main>
       </div>
@@ -523,7 +537,7 @@ export default function App() {
   return (
     <div style={S.root}>
       <Topbar auth={auth} phase={phase} setPhase={setPhase} setAuth={setAuth} daftar={daftar} tab={tab} setTab={setTab} questions={questions}/>
-      <main style={S.main}>
+      <main style={S.main} className="main-resp">
         {phase === "landing" && <Landing onMulai={()=>setPhase("form")} />}
         {phase === "form" && <FormSiswa siswa={formSiswa} onChange={setFormSiswa} onLanjut={() => {
           setCurrent(0); setAnswers({});
@@ -570,8 +584,8 @@ export default function App() {
 function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab,questions}) {
   return (
     <header style={S.header}>
-      <div style={S.headerInner}>
-        <div style={{display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}
+      <div className="header-inner" style={{maxWidth:1200,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
+        <div className="header-brand" style={{display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}
           onClick={()=>setPhase(auth.role==="panitia"?"dashboard":"landing")}>
           <span style={{fontSize:26,color:"#3B82F6"}}>◈</span>
           <div>
@@ -579,12 +593,12 @@ function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab,questions}) {
             <div style={{fontSize:11,color:"#475569"}}>Sistem PPDB SMA 2025/2026</div>
           </div>
         </div>
-        <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+        <div className="nav-btns">
           {auth.role==="panitia"&&<>
-            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="dashboard"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("dashboard");}}>Dashboard</button>
-            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="kelas"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("kelas");}}>🏫 Kelas</button>
-            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="data"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("data");}}>Data ({daftar.length})</button>
-            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="soal"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("soal");}}>📝 Soal ({questions.length})</button>
+            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="dashboard"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("dashboard");}}>📊</button>
+            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="kelas"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("kelas");}}>🏫</button>
+            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="data"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("data");}}>Data</button>
+            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="soal"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("soal");}}>📝</button>
           </>}
           <button style={S.navBtn} onClick={()=>setPhase("landing")}>+ Asesmen</button>
           <button style={{...S.navBtn,background:"#1E293B"}} onClick={()=>setAuth(null)}>Keluar</button>
@@ -645,7 +659,7 @@ function SetupWizard({kelas,target,onSaveKelas,onSaveTarget,onDone,dbLoading}) {
               return (
                 <div key={k.id} style={{background:"#0B1120",border:"1px solid "+(cat?.color||"#334155")+"44",borderRadius:11,padding:12,marginBottom:8,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
                   <span style={{fontSize:20}}>{cat?.icon}</span>
-                  <div style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1.5fr 80px auto",gap:8,alignItems:"center",minWidth:280}}>
+                  <div className="kelas-row-grid" style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1.5fr 80px auto",gap:8,alignItems:"center"}}>
                     <input style={{...S.inp,padding:"6px 9px",fontSize:13}} value={k.nama} onChange={e=>updK(i,"nama",e.target.value)}/>
                     <select style={{...S.inp,padding:"6px 9px",fontSize:13}} value={k.bidang} onChange={e=>updK(i,"bidang",e.target.value)}>
                       {CAT.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
@@ -675,14 +689,14 @@ function Landing({onMulai}) {
     <div style={{display:"flex",flexDirection:"column",gap:26}}>
       <div style={{textAlign:"center",padding:"38px 16px"}}>
         <div style={S.badge}>✦ PPDB 2025/2026</div>
-        <h1 style={{fontSize:46,fontWeight:900,lineHeight:1.1,margin:"14px 0 14px",
+        <h1 className="landing-h1" style={{fontWeight:900,lineHeight:1.1,margin:"14px 0 14px",
           background:"linear-gradient(135deg,#60A5FA,#A78BFA)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
           Temukan Bakat<br/>&amp; Minatmu
         </h1>
         <p style={{fontSize:15,color:"#94A3B8",maxWidth:480,margin:"0 auto 22px",lineHeight:1.7}}>60 pertanyaan mendalam · 6 bidang minat · Analisis instan</p>
         <button style={S.cta} onClick={onMulai}>Mulai Asesmen →</button>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+      <div className="grid-cat">
         {CAT.map(c=>(
           <div key={c.id} style={{background:"#0F172A",border:"1px solid "+c.color+"44",borderRadius:12,padding:"14px 16px",display:"flex",alignItems:"center",gap:12}}>
             <span style={{width:38,height:38,borderRadius:10,background:c.color+"22",color:c.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{c.icon}</span>
@@ -803,7 +817,7 @@ function Hasil({siswa,onBaru,onDaftar,auth}) {
           </div>
         </div>
       )}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+      <div className="grid-top3">
         {top.map((t,i)=>(
           <div key={t.id} style={{background:"#0F172A",border:"2px solid "+t.color,borderRadius:16,padding:18,textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
             <div style={{fontSize:10,fontWeight:800,color:"#475569",letterSpacing:2}}>#{i+1}</div>
@@ -916,7 +930,7 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
             background:daftar.length>=target.max?"#EF4444":daftar.length>=target.min?"#10B981":"#3B82F6"}}/>
         </div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:11}}>
+      <div className="grid-stats4">
         {[["Total Peserta",daftar.length,"#3B82F6","👥"],
           ["Hari Ini",daftar.filter(s=>s.tanggalAsesmen===new Date().toLocaleDateString("id-ID",{dateStyle:"long"})).length,"#10B981","📅"],
           ["Bakat Terbanyak",topCat,"#8B5CF6","🏆"],
@@ -934,7 +948,7 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
           <h3 style={S.cardTitle}>🏫 Status Kelas</h3>
           <button style={S.ghost} onClick={()=>setTab("kelas")}>Kelola →</button>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+        <div className="grid-kelas">
           {kelas.map(k=>{
             const terisi=daftar.filter(s=>s.kelasId===k.id).length;
             const pct=Math.round((terisi/k.kapasitas)*100);
@@ -962,7 +976,7 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
             const pct=daftar.length?Math.round((counts[c.id]/daftar.length)*100):0;
             return (
               <div key={c.id} style={{display:"flex",alignItems:"center",gap:10}}>
-                <span style={{minWidth:192,fontSize:13,color:"#CBD5E1"}}>{c.icon} {c.label}</span>
+                <span className="dist-label">{c.icon} {c.label}</span>
                 <div style={{flex:1,height:12,background:"#1E293B",borderRadius:99,overflow:"hidden"}}>
                   <div style={{width:pct+"%",height:"100%",background:c.color,borderRadius:99,transition:"width 1s"}}/>
                 </div>
@@ -978,7 +992,7 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
             <h3 style={S.cardTitle}>5 Asesmen Terbaru</h3>
             <button style={S.ghost} onClick={()=>setTab("data")}>Lihat Semua →</button>
           </div>
-          <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["Nama","NISN","Bakat Utama","Kelas","Skor",""].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
             <tbody>
               {[...daftar].reverse().slice(0,5).map(s=>{
@@ -995,7 +1009,7 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         </div>
       ):(
         <div style={{textAlign:"center",padding:56,background:"#0F172A",borderRadius:16,border:"1px solid #1E293B"}}>
@@ -1045,7 +1059,7 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
       {showAdd&&(
         <div style={{...S.card,borderColor:"#3B82F655"}}>
           <h3 style={S.cardTitle}>Tambah Kelas Baru</h3>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:11,marginTop:12}}>
+          <div className="grid-soal-kelas">
             <div style={S.fg}><label style={S.lbl}>Nama Kelas</label><input style={S.inp} value={newK.nama} onChange={e=>setNewK({...newK,nama:e.target.value})} placeholder="X-E"/></div>
             <div style={S.fg}><label style={S.lbl}>Kapasitas</label><input style={S.inp} type="number" value={newK.kapasitas} onChange={e=>setNewK({...newK,kapasitas:e.target.value})}/></div>
             <div style={S.fg}><label style={S.lbl}>Bidang</label><select style={S.inp} value={newK.bidang} onChange={e=>setNewK({...newK,bidang:e.target.value})}>{CAT.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}</select></div>
@@ -1054,7 +1068,7 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
           <div style={{display:"flex",gap:8}}><button style={S.cta} onClick={add} disabled={!newK.nama}>Tambah</button><button style={S.ghost} onClick={()=>setShowAdd(false)}>Batal</button></div>
         </div>
       )}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:11}}>
+      <div className="grid-kelas-tab">
         {kelas.map(k=>{
           const terisi=daftar.filter(s=>s.kelasId===k.id).length;
           const pct=Math.round((terisi/k.kapasitas)*100);
@@ -1134,8 +1148,8 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa})
           <div style={{fontSize:34,marginBottom:8}}>🔍</div><p style={{color:"#475569"}}>Tidak ada data yang sesuai.</p>
         </div>
       ):(
-        <div style={{overflowX:"auto",background:"#0F172A",borderRadius:14,border:"1px solid #1E293B"}}>
-          <table style={{width:"100%",borderCollapse:"collapse"}}>
+        <div className="tbl-wrap" style={{background:"#0F172A"}}>
+          <table style={{width:"100%",borderCollapse:"collapse"}}
             <thead><tr>{["No","Nama","NISN","Sekolah","Bakat Utama","Skor","Kelas","Aksi"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
             <tbody>
               {filtered.map((s,i)=>{
@@ -1287,5 +1301,77 @@ const S = {
 };
 
 const _s=document.createElement("style");
-_s.textContent="@keyframes spin{to{transform:rotate(360deg)}} input:focus,select:focus{border-color:#3B82F6!important}";
+_s.textContent=`
+@keyframes spin{to{transform:rotate(360deg)}}
+input:focus,select:focus{border-color:#3B82F6!important}
+
+/* ── RESPONSIVE BASE ── */
+*{box-sizing:border-box}
+
+/* Table scroll wrapper */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:14px;border:1px solid #1E293B}
+.tbl-wrap table{min-width:520px}
+
+/* Nav responsive */
+.nav-btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+
+/* Grid helpers */
+.grid-cat{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.grid-top3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid-stats4{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+.grid-kelas{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.grid-kelas-tab{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.grid-soal-kelas{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:12px}
+
+/* Distribusi bakat label */
+.dist-label{min-width:192px;font-size:13px;color:#CBD5E1}
+
+/* Header inner */
+.header-inner{max-width:1200px;margin:0 auto;padding:11px 18px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.header-brand{display:flex;align-items:center;gap:12px;cursor:pointer}
+
+/* Landing h1 */
+.landing-h1{font-size:46px;font-weight:900;line-height:1.1;margin:14px 0 14px;background:linear-gradient(135deg,#60A5FA,#A78BFA);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+
+@media(max-width:639px){
+  /* Header */
+  .header-inner{padding:10px 12px;gap:6px}
+  .header-brand span:last-child div:first-child{font-size:12px}
+  .nav-btns{gap:4px}
+  .nav-btns button{padding:5px 9px!important;font-size:11px!important}
+
+  /* Landing */
+  .landing-h1{font-size:28px!important}
+
+  /* Grids → 2 or 1 col */
+  .grid-cat{grid-template-columns:repeat(2,1fr)!important}
+  .grid-top3{grid-template-columns:repeat(3,1fr)!important;gap:8px!important}
+  .grid-stats4{grid-template-columns:repeat(2,1fr)!important}
+  .grid-kelas{grid-template-columns:repeat(2,1fr)!important}
+  .grid-kelas-tab{grid-template-columns:1fr!important}
+  .grid-soal-kelas{grid-template-columns:1fr!important}
+
+  /* Distribusi */
+  .dist-label{min-width:130px!important;font-size:12px!important}
+
+  /* Card padding */
+  .card-resp{padding:14px!important}
+
+  /* Form kelas input row */
+  .kelas-row-grid{grid-template-columns:1fr 1fr!important;min-width:0!important}
+
+  /* Main padding */
+  .main-resp{padding:14px 10px!important}
+
+  /* Table: hide less important columns on mobile via class */
+  .col-hide-mobile{display:none!important}
+}
+
+@media(min-width:640px) and (max-width:1023px){
+  .grid-cat{grid-template-columns:repeat(3,1fr)}
+  .grid-stats4{grid-template-columns:repeat(2,1fr)}
+  .grid-kelas{grid-template-columns:repeat(2,1fr)}
+  .landing-h1{font-size:36px}
+}
+`;
 document.head.appendChild(_s);
