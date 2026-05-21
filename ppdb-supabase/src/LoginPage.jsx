@@ -26,6 +26,17 @@ export default function LoginPage({ onLogin }) {
   const [u, setU] = useState(""); const [p, setP] = useState("");
   const [err, setErr] = useState(""); const [ok, setOk] = useState("");
   const [loading, setLoading] = useState(false);
+  const [logoClick, setLogoClick] = useState(0);
+  const [showOwner, setShowOwner] = useState(false);
+
+  function handleLogoClick() {
+    const next = logoClick + 1;
+    setLogoClick(next);
+    if (next >= 5) {
+      setShowOwner(true);
+      setLogoClick(0);
+    }
+  }
 
   // Form registrasi
   const [reg, setReg] = useState({
@@ -86,7 +97,7 @@ export default function LoginPage({ onLogin }) {
     <div style={S.root}>
       <div style={S.card}>
         <div style={{ textAlign:"center", marginBottom:22 }}>
-          <div style={{ fontSize:42, color:"#3B82F6" }}>◈</div>
+          <div style={{ fontSize:42, color:"#3B82F6", cursor:"pointer", userSelect:"none" }} onClick={handleLogoClick}>◈</div>
           <h1 style={S.title}>PPDB Asesmen Bakat & Minat</h1>
           <p style={S.sub}>Sistem Penjurusan Cerdas — SMA 2025/2026</p>
         </div>
@@ -96,7 +107,9 @@ export default function LoginPage({ onLogin }) {
           <button style={{...S.tabBtn,...(mode==="siswa"?S.tabAct:{})}} onClick={()=>{setMode("siswa");resetForm();}}>Siswa</button>
           <button style={{...S.tabBtn,...(mode==="panitia"?S.tabAct:{})}} onClick={()=>{setMode("panitia");resetForm();}}>Panitia</button>
           <button style={{...S.tabBtn,...(mode==="daftar"?S.tabAct:{})}} onClick={()=>{setMode("daftar");resetForm();}}>Daftar</button>
-          <button style={{...S.tabBtn,...(mode==="owner"?S.tabAct:{})}} onClick={()=>{setMode("owner");resetForm();}}>Owner</button>
+          {showOwner && (
+            <button style={{...S.tabBtn,...(mode==="owner"?S.tabAct:{}), color:"#8B5CF6"}} onClick={()=>{setMode("owner");resetForm();}}>🔐 Owner</button>
+          )}
         </div>
 
         {/* ── SISWA ── */}
