@@ -237,3 +237,16 @@ function siswaToDbRow(s) {
     top_bakat: s.top,
   };
 }
+
+// ══════════════════════════════════════════
+// VALIDASI KODE SEKOLAH (untuk siswa)
+// ══════════════════════════════════════════
+export async function fetchSekolahByKode(kode) {
+  const { data, error } = await supabase
+    .from("sekolah")
+    .select("id, nama, kode, aktif")
+    .eq("kode", kode.toUpperCase().trim())
+    .maybeSingle();
+  if (error) throw error;
+  return data; // null jika tidak ditemukan
+}
