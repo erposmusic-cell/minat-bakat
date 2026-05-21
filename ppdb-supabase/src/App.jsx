@@ -13,6 +13,45 @@ function useIsMobile() {
   }, []);
   return isMobile;
 }
+
+// ──────────────────────────────────────────
+// URL ROUTING (tanpa library tambahan)
+// ──────────────────────────────────────────
+// Peta phase+tab → path URL
+const PHASE_TO_PATH = {
+  "landing":          "/",
+  "kode":             "/kode",
+  "form":             "/asesmen/form",
+  "asesmen":          "/asesmen/soal",
+  "result":           "/asesmen/hasil",
+  "dashboard:dashboard": "/dashboard",
+  "dashboard:kelas":     "/dashboard/kelas",
+  "dashboard:data":      "/dashboard/data",
+  "dashboard:soal":      "/dashboard/soal",
+};
+
+const PATH_TO_STATE = {
+  "/":                  { phase:"landing",    tab:"dashboard" },
+  "/kode":              { phase:"kode",        tab:"dashboard" },
+  "/asesmen/form":      { phase:"form",        tab:"dashboard" },
+  "/asesmen/soal":      { phase:"asesmen",     tab:"dashboard" },
+  "/asesmen/hasil":     { phase:"result",      tab:"dashboard" },
+  "/dashboard":         { phase:"dashboard",   tab:"dashboard" },
+  "/dashboard/kelas":   { phase:"dashboard",   tab:"kelas" },
+  "/dashboard/data":    { phase:"dashboard",   tab:"data" },
+  "/dashboard/soal":    { phase:"dashboard",   tab:"soal" },
+};
+
+function getPath(phase, tab) {
+  return PHASE_TO_PATH[phase==="dashboard" ? `dashboard:${tab}` : phase] || "/";
+}
+
+function navigate(phase, tab="dashboard") {
+  const path = getPath(phase, tab);
+  if (window.location.pathname !== path) {
+    window.history.pushState({ phase, tab }, "", path);
+  }
+}
 import * as XLSX from "xlsx";
 import {
   supabase,
@@ -370,9 +409,15 @@ function doPrintSiswa(siswa) {
 // APP ROOT
 // ══════════════════════════════════════════
 export default function App() {
+  // Baca initial state dari URL saat pertama load
+  const initFromUrl = () => {
+    const s = PATH_TO_STATE[window.location.pathname];
+    return s || { phase:"landing", tab:"dashboard" };
+  };
+
   const [auth, setAuth]           = useState(null);
-  const [phase, setPhase]         = useState("landing");
-  const [tab, setTab]             = useState("dashboard");
+  const [phase, setPhaseRaw]      = useState(() => initFromUrl().phase);
+  const [tab,   setTabRaw]        = useState(() => initFromUrl().tab);
   const [formSiswa, setFormSiswa] = useState({nama:"",nisn:"",sekolah:"",tgl:""});
   const [answers, setAnswers]     = useState({});
   const [current, setCurrent]     = useState(0);
@@ -386,8 +431,30 @@ export default function App() {
   const [dbError, setDbError]     = useState(null);
   const [questions, setQuestions] = useState([]);
   const [shuffled, setShuffled]   = useState([]);
-  // Sekolah tujuan siswa (diisi lewat kode unik)
-  const [siswaSchool, setSiswaSchool] = useState(null); // {id, nama, kode}
+  const [siswaSchool, setSiswaSchool] = useState(null);
+
+  // Wrapper setPhase & setTab yang sekaligus update URL
+  function setPhase(p, t) {
+    const newTab = t !== undefined ? t : tab;
+    setPhaseRaw(p);
+    if (t !== undefined) setTabRaw(t);
+    navigate(p, newTab);
+  }
+  function setTab(t) {
+    setTabRaw(t);
+    navigate(phase, t);
+  }
+
+  // Tangani tombol Back/Forward browser
+  useEffect(() => {
+    function onPop(e) {
+      const s = PATH_TO_STATE[window.location.pathname] || { phase:"landing", tab:"dashboard" };
+      setPhaseRaw(s.phase);
+      setTabRaw(s.tab);
+    }
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   // ── Load data dari Supabase — semua query pakai auth.school_id ──
   const loadAllData = useCallback(async () => {
@@ -487,13 +554,16 @@ export default function App() {
     setAnswers({}); setCurrent(0);
     setFormSiswa({nama:"",nisn:"",sekolah:"",tgl:""});
     setSiswaSchool(null);
-    setPhase("landing");
+    setPhaseRaw("landing");
+    navigate("landing");
   }
 
   if (!auth) return (
     <LoginPage onLogin={(role, userData) => {
       setAuth({role, ...userData});
-      setPhase(role==="panitia"?"dashboard":"landing");
+      const target = role==="panitia" ? "dashboard" : "landing";
+      setPhaseRaw(target);
+      navigate(target);
     }}/>
   );
 
@@ -564,7 +634,7 @@ export default function App() {
             onSelesai={handleSelesai}
           />
         )}
-        {phase === "result" && viewSiswa && <Hasil siswa={viewSiswa} onBaru={resetAsesmen} onDaftar={()=>{setPhase("dashboard");setTab("data");}} auth={auth}/>}
+        {phase === "result" && viewSiswa && <Hasil siswa={viewSiswa} onBaru={resetAsesmen} onDaftar={()=>setPhase("dashboard","data")} auth={auth}/>}
         {phase === "dashboard" && auth.role==="panitia" && (
           <Dashboard
             daftar={daftar} setDaftar={setDaftar}
@@ -622,10 +692,10 @@ function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab,questions}) {
                 {copied ? "✅ Tersalin!" : `🔑 ${auth.kodeSekolah}`}
               </button>
             )}
-            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="dashboard"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("dashboard");}}>📊</button>
-            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="kelas"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("kelas");}}>🏫</button>
-            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="data"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("data");}}>Data</button>
-            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="soal"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("soal");}}>📝</button>
+            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="dashboard"?S.navAct:{})}} onClick={()=>setPhase("dashboard","dashboard")}>📊</button>
+            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="kelas"?S.navAct:{})}} onClick={()=>setPhase("dashboard","kelas")}>🏫</button>
+            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="data"?S.navAct:{})}} onClick={()=>setPhase("dashboard","data")}>Data</button>
+            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="soal"?S.navAct:{})}} onClick={()=>setPhase("dashboard","soal")}>📝</button>
           </>}
           <button style={S.navBtn} onClick={()=>setPhase("landing")}>+ Asesmen</button>
           <button style={{...S.navBtn,background:"#1E293B"}} onClick={()=>setAuth(null)}>Keluar</button>
