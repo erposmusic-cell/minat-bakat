@@ -84,7 +84,7 @@ export async function loginPanitia(username, password) {
   if (!data) return null;
 
   const { data: sekolah } = await supabase
-    .from("sekolah").select("aktif, nama").eq("id", data.school_id).maybeSingle();
+    .from("sekolah").select("aktif, nama, kode").eq("id", data.school_id).maybeSingle();
 
   if (!sekolah?.aktif) {
     throw new Error("Akun sekolah belum diaktifkan. Silakan hubungi admin.");
@@ -93,6 +93,7 @@ export async function loginPanitia(username, password) {
   return {
     username: data.username, nama: data.nama,
     school_id: data.school_id, namaSekolah: sekolah.nama,
+    kodeSekolah: sekolah.kode,
   };
 }
 
