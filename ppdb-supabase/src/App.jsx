@@ -29,6 +29,7 @@ import {
   insertSoal,
   updateSoal,
   deleteSoal,
+  fetchSekolahByKode,
 } from "./supabaseClient";
 import LoginPage from "./LoginPage";
 import OwnerDashboard from "./OwnerDashboard";
@@ -385,6 +386,8 @@ export default function App() {
   const [dbError, setDbError]     = useState(null);
   const [questions, setQuestions] = useState([]);
   const [shuffled, setShuffled]   = useState([]);
+  // Sekolah tujuan siswa (diisi lewat kode unik)
+  const [siswaSchool, setSiswaSchool] = useState(null); // {id, nama, kode}
 
   // ── Load data dari Supabase — semua query pakai auth.school_id ──
   const loadAllData = useCallback(async () => {
@@ -436,9 +439,9 @@ export default function App() {
     setViewSiswa(rec);
     setPhase("result");
     try {
-      // Siswa yang mengerjakan asesmen tidak punya school_id (login sebagai siswa)
-      // Gunakan school_id dari auth jika panitia, atau null jika siswa
-      const sid = auth?.school_id || null;
+      // Panitia input → pakai school_id panitia
+      // Siswa mandiri → pakai school_id dari kode sekolah yang diinput
+      const sid = auth?.school_id || siswaSchool?.id || null;
       await insertSiswa(rec, sid);
       if (auth?.role === "panitia") await loadAllData();
     } catch(e) {
@@ -483,6 +486,7 @@ export default function App() {
   function resetAsesmen() {
     setAnswers({}); setCurrent(0);
     setFormSiswa({nama:"",nisn:"",sekolah:"",tgl:""});
+    setSiswaSchool(null);
     setPhase("landing");
   }
 
@@ -538,8 +542,14 @@ export default function App() {
     <div style={S.root}>
       <Topbar auth={auth} phase={phase} setPhase={setPhase} setAuth={setAuth} daftar={daftar} tab={tab} setTab={setTab} questions={questions}/>
       <main style={S.main} className="main-resp">
-        {phase === "landing" && <Landing onMulai={()=>setPhase("form")} />}
-        {phase === "form" && <FormSiswa siswa={formSiswa} onChange={setFormSiswa} onLanjut={() => {
+        {phase === "landing" && <Landing onMulai={()=>setPhase(auth?.role==="panitia"?"form":"kode")} />}
+        {phase === "kode" && (
+          <InputKodeSekolah
+            onValid={(sekolah) => { setSiswaSchool(sekolah); setPhase("form"); }}
+            onBatal={() => setPhase("landing")}
+          />
+        )}
+        {phase === "form" && <FormSiswa siswa={formSiswa} onChange={setFormSiswa} siswaSchool={siswaSchool} onLanjut={() => {
           setCurrent(0); setAnswers({});
           const q = questions.length > 0 ? questions : QUESTIONS;
           setShuffled([...q].sort(() => Math.random() - 0.5));
@@ -711,13 +721,89 @@ function Landing({onMulai}) {
 // ══════════════════════════════════════════
 // FORM SISWA
 // ══════════════════════════════════════════
-function FormSiswa({siswa,onChange,onLanjut}) {
+// ══════════════════════════════════════════
+// INPUT KODE SEKOLAH (siswa mandiri)
+// ══════════════════════════════════════════
+function InputKodeSekolah({onValid, onBatal}) {
+  const [kode, setKode]     = useState("");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr]       = useState("");
+
+  async function handleCek() {
+    if (!kode.trim()) return;
+    setLoading(true); setErr("");
+    try {
+      const sekolah = await fetchSekolahByKode(kode.trim());
+      if (!sekolah) {
+        setErr("Kode sekolah tidak ditemukan. Periksa kembali kode dari panitia.");
+      } else if (!sekolah.aktif) {
+        setErr("Sekolah ini belum aktif. Hubungi panitia sekolah Anda.");
+      } else {
+        onValid(sekolah);
+      }
+    } catch(e) {
+      setErr("Gagal verifikasi: " + e.message);
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div style={{display:"flex",justifyContent:"center"}}>
+      <div style={{...S.card,maxWidth:460,width:"100%",textAlign:"center"}}>
+        <div style={{fontSize:40,marginBottom:10}}>🏫</div>
+        <h2 style={{...S.cardTitle,textAlign:"center",marginBottom:6}}>Kode Sekolah</h2>
+        <p style={{color:"#475569",fontSize:13,marginBottom:22,lineHeight:1.6}}>
+          Masukkan kode unik yang diberikan oleh panitia sekolah tujuan Anda.
+        </p>
+        <div style={S.fg}>
+          <label style={S.lbl}>Kode Sekolah</label>
+          <input
+            style={{...S.inp,textAlign:"center",fontSize:18,fontWeight:700,letterSpacing:3,textTransform:"uppercase"}}
+            placeholder="Contoh: SMA-001"
+            value={kode}
+            onChange={e=>{setKode(e.target.value.toUpperCase());setErr("");}}
+            onKeyDown={e=>e.key==="Enter"&&handleCek()}
+            maxLength={20}
+          />
+        </div>
+        {err && (
+          <div style={{background:"#EF444422",border:"1px solid #EF444466",borderRadius:10,padding:"10px 14px",color:"#FCA5A5",fontSize:13,marginBottom:14,textAlign:"left"}}>
+            ⚠️ {err}
+          </div>
+        )}
+        <button
+          style={{...S.cta,width:"100%",opacity:kode.trim()&&!loading?1:0.4}}
+          disabled={!kode.trim()||loading}
+          onClick={handleCek}
+        >
+          {loading?"Memeriksa...":"Verifikasi Kode →"}
+        </button>
+        <button style={{...S.ghost,width:"100%",marginTop:10}} onClick={onBatal}>← Kembali</button>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+// FORM SISWA
+// ══════════════════════════════════════════
+function FormSiswa({siswa,onChange,onLanjut,siswaSchool}) {
   const valid = siswa.nama && siswa.nisn && siswa.sekolah;
   return (
     <div style={{display:"flex",justifyContent:"center"}}>
       <div style={{...S.card,maxWidth:520,width:"100%"}}>
         <h2 style={S.cardTitle}>Data Peserta</h2>
         <p style={{color:"#475569",fontSize:13,marginBottom:18}}>Lengkapi identitas sebelum memulai asesmen</p>
+        {siswaSchool && (
+          <div style={{background:"#10B98122",border:"1px solid #10B98166",borderRadius:10,padding:"10px 14px",marginBottom:16,display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:20}}>🏫</span>
+            <div>
+              <div style={{fontSize:12,color:"#6EE7B7",fontWeight:700}}>Sekolah Tujuan</div>
+              <div style={{fontSize:14,color:"#E2E8F0",fontWeight:600}}>{siswaSchool.nama}</div>
+              <div style={{fontSize:11,color:"#475569"}}>Kode: {siswaSchool.kode}</div>
+            </div>
+          </div>
+        )}
         {[["Nama Lengkap *","text","Masukkan nama lengkap","nama"],
           ["NISN *","text","Nomor Induk Siswa Nasional","nisn"],
           ["Asal Sekolah *","text","Nama SMP/MTs asal","sekolah"],
@@ -1149,7 +1235,7 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa})
         </div>
       ):(
         <div className="tbl-wrap" style={{background:"#0F172A"}}>
-          <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <table style={{width:"100%",borderCollapse:"collapse"}}
             <thead><tr>{["No","Nama","NISN","Sekolah","Bakat Utama","Skor","Kelas","Aksi"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
             <tbody>
               {filtered.map((s,i)=>{
