@@ -592,6 +592,14 @@ export default function App() {
 // LOGIN
 // ══════════════════════════════════════════
 function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab,questions}) {
+  const [copied, setCopied] = useState(false);
+  function copyKode() {
+    if (!auth?.kodeSekolah) return;
+    navigator.clipboard.writeText(auth.kodeSekolah).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
   return (
     <header style={S.header}>
       <div className="header-inner" style={{maxWidth:1200,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
@@ -605,6 +613,15 @@ function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab,questions}) {
         </div>
         <div className="nav-btns">
           {auth.role==="panitia"&&<>
+            {auth.kodeSekolah && (
+              <button
+                onClick={copyKode}
+                title="Klik untuk salin kode sekolah"
+                style={{...S.navBtn, background:"#1E3A5F", color: copied?"#4ade80":"#60A5FA", borderColor:"#1E3A5F", fontWeight:700, letterSpacing:1, fontSize:12}}
+              >
+                {copied ? "✅ Tersalin!" : `🔑 ${auth.kodeSekolah}`}
+              </button>
+            )}
             <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="dashboard"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("dashboard");}}>📊</button>
             <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="kelas"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("kelas");}}>🏫</button>
             <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="data"?S.navAct:{})}} onClick={()=>{setPhase("dashboard");setTab("data");}}>Data</button>
@@ -966,6 +983,38 @@ function Hasil({siswa,onBaru,onDaftar,auth}) {
 // ══════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════
+// ══════════════════════════════════════════
+// KODE BANNER (tampil di dashboard panitia)
+// ══════════════════════════════════════════
+function KodeBanner({kode, namaSekolah}) {
+  const [copied, setCopied] = useState(false);
+  function copy() {
+    navigator.clipboard.writeText(kode).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  }
+  return (
+    <div style={{background:"linear-gradient(135deg,#1E3A5F,#0F172A)",border:"1px solid #1E3A5F",borderRadius:14,padding:"16px 20px",display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+      <div style={{fontSize:32}}>🔑</div>
+      <div style={{flex:1}}>
+        <div style={{fontSize:12,color:"#60A5FA",fontWeight:700,marginBottom:2}}>KODE SEKOLAH — Bagikan ke calon siswa</div>
+        <div style={{fontSize:28,fontWeight:900,color:"#E2E8F0",letterSpacing:4}}>{kode}</div>
+        <div style={{fontSize:12,color:"#475569",marginTop:2}}>{namaSekolah} · Siswa wajib input kode ini sebelum asesmen</div>
+      </div>
+      <button
+        onClick={copy}
+        style={{background:copied?"#10B981":"#1E293B",border:"1px solid "+(copied?"#10B981":"#334155"),color:copied?"#fff":"#60A5FA",borderRadius:10,padding:"10px 20px",cursor:"pointer",fontSize:13,fontWeight:700,transition:"all 0.2s",whiteSpace:"nowrap"}}
+      >
+        {copied ? "✅ Tersalin!" : "📋 Salin Kode"}
+      </button>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════
 function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDetail,onBaru,onExport,onSetupUlang,onSaveKelas,onDeleteKelas,onUpdateKelasSiswa,onRefresh,dbLoading}) {
   if(tab==="data")  return <DaftarSiswa daftar={daftar} kelas={kelas} onDetail={onDetail} onBaru={onBaru} onExport={onExport} onUpdateKelasSiswa={onUpdateKelasSiswa}/>;
   if(tab==="soal")  return (
@@ -987,6 +1036,9 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:18}}>
+      {auth?.kodeSekolah && (
+        <KodeBanner kode={auth.kodeSekolah} namaSekolah={auth.namaSekolah} />
+      )}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
         <div>
           <h2 style={S.cardTitle}>Dashboard Panitia PPDB</h2>
