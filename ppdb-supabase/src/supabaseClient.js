@@ -1,7 +1,6 @@
 // src/supabaseClient.js
 // ══════════════════════════════════════════════════════
 // Inisialisasi Supabase — kredensial dari environment variable
-// URL & Key TIDAK pernah ditulis langsung di sini.
 // ══════════════════════════════════════════════════════
 import { createClient } from "@supabase/supabase-js";
 
@@ -17,81 +16,144 @@ if (!SUPABASE_URL || !SUPABASE_ANON) {
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-// ── Helper: login panitia via RPC ──────────────────────
+// ══════════════════════════════════════════════════════
+// MULTI-TENANT: LOGIN PANITIA
+// Login sekarang mengembalikan school_id dari tabel panitia
+// ══════════════════════════════════════════════════════
 export async function loginPanitia(username, password) {
   const { data, error } = await supabase
-    .rpc("cek_login_panitia", { p_username: username, p_password: password });
+    .from("panitia")
+    .select("id, username, nama, school_id")
+    .eq("username", username)
+    .eq("password", password)
+    .maybeSingle();
   if (error) throw error;
-  const row = data?.[0];
-  if (!row || !row.berhasil) return null;
-  return { username, nama: row.nama_panitia };
+  if (!data) return null;
+  return {
+    username: data.username,
+    nama: data.nama,
+    school_id: data.school_id, // ← kunci multi-tenant
+  };
 }
 
-// ── Helper: ambil semua kelas ──────────────────────────
-export async function fetchKelas() {
+// ══════════════════════════════════════════════════════
+// SEKOLAH
+// ══════════════════════════════════════════════════════
+
+// Ambil data sekolah berdasarkan school_id
+export async function fetchSekolah(schoolId) {
+  const { data, error } = await supabase
+    .from("sekolah")
+    .select("*")
+    .eq("id", schoolId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+// Daftarkan sekolah baru (dipakai oleh admin master)
+export async function insertSekolah({ nama, kode, alamat }) {
+  const { data, error } = await supabase
+    .from("sekolah")
+    .insert({ nama, kode, alamat, aktif: true })
+    .select()
+    .single();
+  if (error) throw error;
+  return data; // mengembalikan id sekolah baru
+}
+
+// Daftarkan panitia baru untuk sekolah tertentu
+export async function insertPanitia({ username, password, nama, schoolId }) {
+  const { error } = await supabase
+    .from("panitia")
+    .insert({ username, password, nama, school_id: schoolId });
+  if (error) throw error;
+}
+
+// ══════════════════════════════════════════════════════
+// KELAS — semua query difilter school_id
+// ══════════════════════════════════════════════════════
+export async function fetchKelas(schoolId) {
   const { data, error } = await supabase
     .from("kelas")
     .select("*")
+    .eq("school_id", schoolId)
     .order("nama");
   if (error) throw error;
   return data;
 }
 
-// ── Helper: upsert kelas ──────────────────────────────
-export async function upsertKelas(kelasArr) {
+export async function upsertKelas(kelasArr, schoolId) {
   const rows = kelasArr.map(k => ({
     id: k.id, nama: k.nama, bidang: k.bidang,
     kapasitas: k.kapasitas, wali: k.wali || "",
+    school_id: schoolId,
     updated_at: new Date().toISOString(),
   }));
   const { error } = await supabase.from("kelas").upsert(rows);
   if (error) throw error;
 }
 
-// ── Helper: hapus kelas ───────────────────────────────
 export async function deleteKelas(id) {
   const { error } = await supabase.from("kelas").delete().eq("id", id);
   if (error) throw error;
 }
 
-// ── Helper: ambil target penerimaan ───────────────────
-export async function fetchTarget() {
+// ══════════════════════════════════════════════════════
+// TARGET PENERIMAAN — difilter school_id
+// ══════════════════════════════════════════════════════
+export async function fetchTarget(schoolId) {
   const { data, error } = await supabase
     .from("target_penerimaan")
     .select("*")
-    .eq("id", 1)
-    .maybeSingle(); // ✅ diganti dari .single() ke .maybeSingle()
+    .eq("school_id", schoolId)
+    .maybeSingle();
   if (error) throw error;
-  if (!data) return { min: 0, max: 0 }; // ✅ fallback jika data kosong
+  if (!data) return { min: 120, max: 175 };
   return { min: data.min, max: data.max };
 }
 
-// ── Helper: simpan target penerimaan ──────────────────
-export async function saveTarget(min, max) {
-  const { error } = await supabase
+export async function saveTarget(min, max, schoolId) {
+  // Cek apakah sudah ada target untuk sekolah ini
+  const { data: existing } = await supabase
     .from("target_penerimaan")
-    .upsert({ id: 1, min, max, updated_at: new Date().toISOString() });
-  if (error) throw error;
+    .select("id")
+    .eq("school_id", schoolId)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from("target_penerimaan")
+      .update({ min, max, updated_at: new Date().toISOString() })
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("target_penerimaan")
+      .insert({ min, max, school_id: schoolId, updated_at: new Date().toISOString() });
+    if (error) throw error;
+  }
 }
 
-// ── Helper: ambil semua siswa ─────────────────────────
-export async function fetchSiswa() {
+// ══════════════════════════════════════════════════════
+// SISWA — difilter school_id
+// ══════════════════════════════════════════════════════
+export async function fetchSiswa(schoolId) {
   const { data, error } = await supabase
     .from("siswa")
     .select("*")
+    .eq("school_id", schoolId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data.map(dbRowToSiswa);
 }
 
-// ── Helper: simpan siswa baru ─────────────────────────
-export async function insertSiswa(siswa) {
-  const row = siswaToDbRow(siswa);
+export async function insertSiswa(siswa, schoolId) {
+  const row = { ...siswaToDbRow(siswa), school_id: schoolId };
   const { error } = await supabase.from("siswa").insert(row);
   if (error) throw error;
 }
 
-// ── Helper: update kelas siswa ────────────────────────
 export async function updateKelasSiswa(siswaId, kelasId, kelasNama) {
   const { error } = await supabase
     .from("siswa")
@@ -100,43 +162,21 @@ export async function updateKelasSiswa(siswaId, kelasId, kelasNama) {
   if (error) throw error;
 }
 
-// ── Helper: hapus siswa ───────────────────────────────
 export async function deleteSiswa(id) {
   const { error } = await supabase.from("siswa").delete().eq("id", id);
   if (error) throw error;
 }
 
-// ── Konversi: baris DB → objek aplikasi ──────────────
-function dbRowToSiswa(row) {
-  return {
-    id:              row.id,
-    nama:            row.nama,
-    nisn:            row.nisn,
-    sekolah:         row.sekolah,
-    tgl:             row.tgl_lahir,
-    tanggalAsesmen:  row.tanggal_asesmen,
-    kelasId:         row.kelas_id,
-    kelasNama:       row.kelas_nama,
-    narasi:          row.narasi,
-    scores: {
-      logika:    row.skor_logika    || 0,
-      bahasa:    row.skor_bahasa    || 0,
-      sains:     row.skor_sains     || 0,
-      seni:      row.skor_seni      || 0,
-      sosial:    row.skor_sosial    || 0,
-      olahraga:  row.skor_olahraga  || 0,
-    },
-    top: Array.isArray(row.top_bakat) && row.top_bakat.length > 0
-      ? row.top_bakat
-      : [{ id: "logika", pct: 0, label: "Belum Ada", icon: "❓", color: "#94A3B8" }], // ✅ fallback
-  };
-}
-// ── Helper: ambil soal aktif ──────────────────────────
-export async function fetchSoal() {
+// ══════════════════════════════════════════════════════
+// SOAL — difilter school_id (atau soal global jika null)
+// ══════════════════════════════════════════════════════
+export async function fetchSoal(schoolId) {
+  // Ambil soal milik sekolah ini ATAU soal global (school_id = null)
   const { data, error } = await supabase
     .from("soal")
     .select("*")
     .eq("aktif", true)
+    .or(`school_id.eq.${schoolId},school_id.is.null`)
     .order("kategori")
     .order("urutan");
   if (error) throw error;
@@ -149,19 +189,18 @@ export async function fetchSoal() {
   }));
 }
 
-// ── Helper: tambah soal ───────────────────────────────
-export async function insertSoal(soal) {
+export async function insertSoal(soal, schoolId) {
   const { error } = await supabase.from("soal").insert({
-    kategori: soal.cat,
-    kelompok: soal.grp,
-    teks:     soal.text,
-    urutan:   soal.urutan || 0,
-    aktif:    true,
+    kategori:  soal.cat,
+    kelompok:  soal.grp,
+    teks:      soal.text,
+    urutan:    soal.urutan || 0,
+    aktif:     true,
+    school_id: schoolId,
   });
   if (error) throw error;
 }
 
-// ── Helper: update soal ───────────────────────────────
 export async function updateSoal(id, soal) {
   const { error } = await supabase.from("soal").update({
     kategori: soal.cat,
@@ -172,28 +211,55 @@ export async function updateSoal(id, soal) {
   if (error) throw error;
 }
 
-// ── Helper: hapus soal ────────────────────────────────
 export async function deleteSoal(id) {
   const { error } = await supabase.from("soal").delete().eq("id", id);
   if (error) throw error;
 }
-// ── Konversi: objek aplikasi → baris DB ──────────────
+
+// ══════════════════════════════════════════════════════
+// KONVERSI BARIS DB ↔ OBJEK APLIKASI
+// ══════════════════════════════════════════════════════
+function dbRowToSiswa(row) {
+  return {
+    id:             row.id,
+    nama:           row.nama,
+    nisn:           row.nisn,
+    sekolah:        row.sekolah,
+    tgl:            row.tgl_lahir,
+    tanggalAsesmen: row.tanggal_asesmen,
+    kelasId:        row.kelas_id,
+    kelasNama:      row.kelas_nama,
+    narasi:         row.narasi,
+    scores: {
+      logika:   row.skor_logika   || 0,
+      bahasa:   row.skor_bahasa   || 0,
+      sains:    row.skor_sains    || 0,
+      seni:     row.skor_seni     || 0,
+      sosial:   row.skor_sosial   || 0,
+      olahraga: row.skor_olahraga || 0,
+    },
+    top: Array.isArray(row.top_bakat) && row.top_bakat.length > 0
+      ? row.top_bakat
+      : [{ id: "logika", pct: 0, label: "Belum Ada", icon: "❓", color: "#94A3B8" }],
+  };
+}
+
 function siswaToDbRow(s) {
   return {
-    nama:             s.nama,
-    nisn:             s.nisn,
-    sekolah:          s.sekolah,
-    tgl_lahir:        s.tgl || "",
-    tanggal_asesmen:  s.tanggalAsesmen,
-    kelas_id:         s.kelasId || null,
-    kelas_nama:       s.kelasNama || null,
-    narasi:           s.narasi || "",
-    skor_logika:      s.scores.logika,
-    skor_bahasa:      s.scores.bahasa,
-    skor_sains:       s.scores.sains,
-    skor_seni:        s.scores.seni,
-    skor_sosial:      s.scores.sosial,
-    skor_olahraga:    s.scores.olahraga,
-    top_bakat:        s.top,
+    nama:            s.nama,
+    nisn:            s.nisn,
+    sekolah:         s.sekolah,
+    tgl_lahir:       s.tgl || "",
+    tanggal_asesmen: s.tanggalAsesmen,
+    kelas_id:        s.kelasId  || null,
+    kelas_nama:      s.kelasNama || null,
+    narasi:          s.narasi   || "",
+    skor_logika:     s.scores.logika,
+    skor_bahasa:     s.scores.bahasa,
+    skor_sains:      s.scores.sains,
+    skor_seni:       s.scores.seni,
+    skor_sosial:     s.scores.sosial,
+    skor_olahraga:   s.scores.olahraga,
+    top_bakat:       s.top,
   };
 }
