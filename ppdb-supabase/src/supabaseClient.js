@@ -76,7 +76,7 @@ export async function registerSekolah({ namaSekolah, alamat, kode, username, pas
 export async function loginPanitia(username, password) {
   const { data, error } = await supabase
     .from("panitia")
-    .select("id, username, nama, school_id")
+    .select("id, username, nama, school_id, role, email")
     .eq("username", username)
     .eq("password", password)
     .maybeSingle();
@@ -456,4 +456,52 @@ export async function updateEmailPanitia(schoolId, email) {
     .update({ email })
     .eq("school_id", schoolId);
   if (error) throw error;
+}
+
+// ══════════════════════════════════════════
+// MULTI-ADMIN SEKOLAH
+// ══════════════════════════════════════════
+
+/** Ambil semua admin sekolah */
+export async function getAdminSekolah(schoolId) {
+  const { data, error } = await supabase.rpc("get_admin_sekolah", {
+    p_school_id: schoolId,
+  });
+  if (error) throw error;
+  return data || [];
+}
+
+/** Tambah admin baru (oleh admin_utama) */
+export async function tambahAdmin({ schoolId, username, password, nama, email, dibuatOleh }) {
+  const { data, error } = await supabase.rpc("tambah_admin", {
+    p_school_id:   schoolId,
+    p_username:    username,
+    p_password:    password,
+    p_nama:        nama,
+    p_email:       email || "",
+    p_dibuat_oleh: dibuatOleh,
+  });
+  if (error) throw error;
+  return data?.[0] || null;
+}
+
+/** Hapus admin (hanya admin biasa) */
+export async function hapusAdmin(adminId, schoolId) {
+  const { data, error } = await supabase.rpc("hapus_admin", {
+    p_admin_id:  adminId,
+    p_school_id: schoolId,
+  });
+  if (error) throw error;
+  return data;
+}
+
+/** Cek kuota admin berdasarkan paket lisensi */
+export async function cekKuotaAdmin(schoolId) {
+  const { data, error } = await supabase
+    .from("panitia")
+    .select("id", { count: "exact", head: true })
+    .eq("school_id", schoolId)
+    .eq("role", "admin");
+  if (error) throw error;
+  return data?.count || 0;
 }
