@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
 // ──────────────────────────────────────────
 // RESPONSIVE HOOK
@@ -1212,12 +1212,12 @@ function Asesmen({questions,current,answers,animIn,onAnswer,onNext,onPrev,onSele
 // PENGATURAN LOGO SEKOLAH
 // ══════════════════════════════════════════
 function PengaturanLogo({ auth, logoSekolah, onSaveLogo }) {
-  const [preview, setPreview] = React.useState(logoSekolah || null);
-  const [saving, setSaving] = React.useState(false);
-  const [msg, setMsg] = React.useState("");
-  const fileRef = React.useRef();
+  const [preview, setPreview] = useState(logoSekolah || null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const fileRef = useRef();
 
-  React.useEffect(() => { setPreview(logoSekolah || null); }, [logoSekolah]);
+  useEffect(() => { setPreview(logoSekolah || null); }, [logoSekolah]);
 
   function handleFile(e) {
     const file = e.target.files[0];
