@@ -28,6 +28,8 @@ const PHASE_TO_PATH = {
   "dashboard:kelas":     "/dashboard/kelas",
   "dashboard:data":      "/dashboard/data",
   "dashboard:soal":      "/dashboard/soal",
+  "dashboard:admin":     "/dashboard/admin",
+  "dashboard:logo":      "/dashboard/identitas",
 };
 
 const PATH_TO_STATE = {
@@ -40,6 +42,8 @@ const PATH_TO_STATE = {
   "/dashboard/kelas":   { phase:"dashboard",   tab:"kelas" },
   "/dashboard/data":    { phase:"dashboard",   tab:"data" },
   "/dashboard/soal":    { phase:"dashboard",   tab:"soal" },
+  "/dashboard/admin":   { phase:"dashboard",   tab:"admin" },
+  "/dashboard/identitas": { phase:"dashboard", tab:"logo" },
 };
 
 function getPath(phase, tab) {
