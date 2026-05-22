@@ -1,6 +1,6 @@
 // src/LoginPage.jsx
 import { useState } from "react";
-import { loginPanitia, loginOwner, registerSekolah } from "./supabaseClient";
+import { loginPanitia, loginOwner, registerSekolah, requestResetPassword, verifyResetToken } from "./supabaseClient";
 import { PAKET_LIST } from "./paketConfig";
 
 const S = {
@@ -29,6 +29,12 @@ export default function LoginPage({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [logoClick, setLogoClick] = useState(0);
   const [showOwner, setShowOwner] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false); // false | "email" | "token"
+  const [fpEmail, setFpEmail] = useState("");
+  const [fpToken, setFpToken] = useState("");
+  const [fpPass, setFpPass] = useState("");
+  const [fpMsg, setFpMsg] = useState("");
+  const [fpLoading, setFpLoading] = useState(false);
 
   function handleLogoClick() {
     const next = logoClick + 1;
@@ -54,6 +60,37 @@ export default function LoginPage({ onLogin }) {
       else { onLogin("panitia", userData); }
     } catch(e) { setErr(e.message || "Koneksi gagal."); }
     setLoading(false);
+  }
+
+  async function handleForgotRequest() {
+    if (!fpEmail) { setFpMsg("❌ Masukkan email terlebih dahulu."); return; }
+    setFpLoading(true); setFpMsg("");
+    try {
+      const res = await requestResetPassword(fpEmail);
+      if (!res?.berhasil) {
+        setFpMsg("❌ Email tidak ditemukan. Hubungi Owner untuk reset manual.");
+      } else {
+        setFpMsg("✅ Token reset dikirim! Cek email: " + fpEmail);
+        setForgotMode("token");
+      }
+    } catch(e) { setFpMsg("❌ " + (e.message || "Gagal mengirim.")); }
+    setFpLoading(false);
+  }
+
+  async function handleForgotVerify() {
+    if (!fpToken || !fpPass) { setFpMsg("❌ Isi token dan password baru."); return; }
+    if (fpPass.length < 6) { setFpMsg("❌ Password minimal 6 karakter."); return; }
+    setFpLoading(true); setFpMsg("");
+    try {
+      const res = await verifyResetToken(fpToken, fpPass);
+      if (res?.berhasil) {
+        setFpMsg("✅ Password berhasil diubah! Silakan login.");
+        setTimeout(() => { setForgotMode(false); setFpEmail(""); setFpToken(""); setFpPass(""); setFpMsg(""); }, 2000);
+      } else {
+        setFpMsg("❌ " + (res?.pesan || "Token tidak valid."));
+      }
+    } catch(e) { setFpMsg("❌ " + (e.message || "Gagal verifikasi.")); }
+    setFpLoading(false);
   }
 
   async function tryLoginOwner() {
@@ -137,9 +174,50 @@ export default function LoginPage({ onLogin }) {
               {loading?"Memverifikasi...":"Login Panitia →"}
             </button>
             <hr style={S.divider}/>
-            <p style={{ color:"#475569", fontSize:12, textAlign:"center", margin:0 }}>
-              Belum punya akun? <span style={{ color:"#60A5FA", cursor:"pointer" }} onClick={()=>{setMode("daftar");resetForm();}}>Daftarkan sekolah Anda</span>
-            </p>
+
+            {/* ── Forgot Password ── */}
+            {!forgotMode && (
+              <div style={{textAlign:"center"}}>
+                <span style={{color:"#60A5FA",fontSize:12,cursor:"pointer"}} onClick={()=>{setForgotMode("email");setFpMsg("");}}>
+                  Lupa password?
+                </span>
+                <span style={{color:"#334155",fontSize:12,margin:"0 8px"}}>·</span>
+                <span style={{color:"#60A5FA",fontSize:12,cursor:"pointer"}} onClick={()=>{setMode("daftar");resetForm();}}>
+                  Daftar sekolah baru
+                </span>
+              </div>
+            )}
+            {forgotMode === "email" && (
+              <div style={{background:"#0B1120",border:"1px solid #1E3A5F",borderRadius:12,padding:16,marginTop:4}}>
+                <div style={{fontWeight:700,fontSize:13,color:"#60A5FA",marginBottom:10}}>🔑 Lupa Password</div>
+                {fpMsg && <div style={{background:fpMsg.startsWith("✅")?"#052e16":"#2d0a0a",border:"1px solid "+(fpMsg.startsWith("✅")?"#16a34a":"#ef4444"),borderRadius:8,padding:"7px 11px",fontSize:12,marginBottom:10,color:fpMsg.startsWith("✅")?"#4ade80":"#f87171"}}>{fpMsg}</div>}
+                <label style={{...S.lbl}}>Email terdaftar</label>
+                <input style={{...S.inp,marginBottom:10}} type="email" placeholder="email@sekolah.com" value={fpEmail} onChange={e=>setFpEmail(e.target.value)}/>
+                <div style={{display:"flex",gap:8}}>
+                  <button style={{...S.ghost,marginTop:0,flex:1}} onClick={()=>{setForgotMode(false);setFpMsg("");}}>Batal</button>
+                  <button style={{...S.cta,flex:2,padding:"9px"}} onClick={handleForgotRequest} disabled={fpLoading}>
+                    {fpLoading?"Mengirim...":"Kirim Token Reset →"}
+                  </button>
+                </div>
+                <div style={{fontSize:11,color:"#475569",marginTop:8,textAlign:"center"}}>Atau minta Owner sekolah untuk reset password manual.</div>
+              </div>
+            )}
+            {forgotMode === "token" && (
+              <div style={{background:"#0B1120",border:"1px solid #1E3A5F",borderRadius:12,padding:16,marginTop:4}}>
+                <div style={{fontWeight:700,fontSize:13,color:"#60A5FA",marginBottom:10}}>🔒 Masukkan Token & Password Baru</div>
+                {fpMsg && <div style={{background:fpMsg.startsWith("✅")?"#052e16":"#2d0a0a",border:"1px solid "+(fpMsg.startsWith("✅")?"#16a34a":"#ef4444"),borderRadius:8,padding:"7px 11px",fontSize:12,marginBottom:10,color:fpMsg.startsWith("✅")?"#4ade80":"#f87171"}}>{fpMsg}</div>}
+                <label style={{...S.lbl}}>Token (dari email)</label>
+                <input style={{...S.inp,marginBottom:10}} placeholder="Tempel token dari email" value={fpToken} onChange={e=>setFpToken(e.target.value)}/>
+                <label style={{...S.lbl}}>Password Baru</label>
+                <input style={{...S.inp,marginBottom:10}} type="password" placeholder="Minimal 6 karakter" value={fpPass} onChange={e=>setFpPass(e.target.value)}/>
+                <div style={{display:"flex",gap:8}}>
+                  <button style={{...S.ghost,marginTop:0,flex:1}} onClick={()=>setForgotMode("email")}>← Kembali</button>
+                  <button style={{...S.cta,flex:2,padding:"9px"}} onClick={handleForgotVerify} disabled={fpLoading}>
+                    {fpLoading?"Memverifikasi...":"Ganti Password ✓"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
