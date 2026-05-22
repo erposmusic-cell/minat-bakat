@@ -93,11 +93,6 @@ const CAT = [
   { id:"olahraga", label:"Olahraga & Kinestetik",  icon:"⚽", color:"#06B6D4" },
 ];
 
-const JURUSAN = JURUSAN_PER_JENJANG["sma_x"]; // default fallback
-function getJurusan(jenjang) {
-  return JURUSAN_PER_JENJANG[jenjang] || JURUSAN_PER_JENJANG["sma_x"];
-}
-
 // ══════════════════════════════════════════
 // JENJANG
 // ══════════════════════════════════════════
@@ -133,6 +128,12 @@ const JURUSAN_PER_JENJANG = {
     olahraga: ["IPA — Kedokteran Olahraga","Vokasi — Kepelatihan","IPA — Fisioterapi","IPS — Manajemen Olahraga","Vokasi — Pend. Jasmani","IPA — Gizi & Kesehatan"],
   },
 };
+
+
+const JURUSAN = JURUSAN_PER_JENJANG["sma_x"]; // default fallback
+function getJurusan(jenjang) {
+  return JURUSAN_PER_JENJANG[jenjang] || JURUSAN_PER_JENJANG["sma_x"];
+}
 
 // ══════════════════════════════════════════
 // GAYA BELAJAR
