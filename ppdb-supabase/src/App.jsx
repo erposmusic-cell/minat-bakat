@@ -1020,9 +1020,9 @@ function InputKodeSekolah({onValid, onBatal}) {
     try {
       const sekolah = await fetchSekolahByKode(kode.trim());
       if (!sekolah) {
-        setErr("Kode sekolah tidak ditemukan. Periksa kembali kode dari panitia.");
+        setErr("Kode sekolah tidak ditemukan. Periksa kembali kode dari pihak sekolah.");
       } else if (!sekolah.aktif) {
-        setErr("Sekolah ini belum aktif. Hubungi panitia sekolah Anda.");
+        setErr("Sekolah ini belum aktif. Hubungi pihak sekolah Anda.");
       } else {
         onValid(sekolah);
       }
@@ -1038,7 +1038,7 @@ function InputKodeSekolah({onValid, onBatal}) {
         <div style={{fontSize:40,marginBottom:10}}>🏫</div>
         <h2 style={{...S.cardTitle,textAlign:"center",marginBottom:6}}>Kode Sekolah</h2>
         <p style={{color:"#475569",fontSize:13,marginBottom:22,lineHeight:1.6}}>
-          Masukkan kode unik yang diberikan oleh panitia sekolah tujuan Anda.
+          Masukkan kode unik yang diberikan oleh pihak sekolah tujuan Anda.
         </p>
         <div style={S.fg}>
           <label style={S.lbl}>Kode Sekolah</label>
@@ -1366,7 +1366,7 @@ function Hasil({siswa,onBaru,onDaftar,auth}) {
 // DASHBOARD
 // ══════════════════════════════════════════
 // ══════════════════════════════════════════
-// KODE BANNER (tampil di dashboard panitia)
+// KODE BANNER (tampil di dashboard sekolah)
 // ══════════════════════════════════════════
 function KodeBanner({kode, namaSekolah}) {
   const [copied, setCopied] = useState(false);
@@ -1423,7 +1423,7 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
       )}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
         <div>
-          <h2 style={S.cardTitle}>Dashboard Panitia PPDB</h2>
+          <h2 style={S.cardTitle}>Dashboard Sekolah PPDB</h2>
           <p style={{color:"#475569",fontSize:13,margin:0}}>Statistik real-time asesmen bakat & minat siswa</p>
         </div>
         <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
