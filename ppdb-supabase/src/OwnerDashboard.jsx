@@ -4,6 +4,7 @@ import {
   supabase,
   fetchAllSekolah, toggleAktifSekolah, deleteSekolah,
   fetchAllLisensi, createLisensi, updateLisensi, deleteLisensi, generateLisensiKey,
+  ownerResetPassword, fetchPanitiaBySchool, updateEmailPanitia,
 } from "./supabaseClient";
 import { PAKET_LIST, getPaketById, formatRupiah } from "./paketConfig";
 
@@ -199,6 +200,11 @@ export default function OwnerDashboard({ auth, onLogout }) {
   const [showModal,  setShowModal]  = useState(false);
   const [lisensiEdit,setLisensiEdit] = useState(null);
   const [copied,     setCopied]   = useState(null);
+  const [resetModal, setResetModal] = useState(null); // { schoolId, nama }
+  const [resetPass,  setResetPass]  = useState("");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMsg,   setResetMsg]   = useState("");
 
   async function load() {
     setLoading(true);
@@ -214,6 +220,36 @@ export default function OwnerDashboard({ auth, onLogout }) {
   async function handleToggle(id, aktif) {
     await toggleAktifSekolah(id, aktif);
     setSekolah(prev => prev.map(s => s.id === id ? { ...s, aktif } : s));
+  }
+
+  async function openResetModal(schoolId, nama) {
+    setResetModal({ schoolId, nama });
+    setResetPass(""); setResetEmail(""); setResetMsg("");
+    setResetLoading(true);
+    try {
+      const panitia = await fetchPanitiaBySchool(schoolId);
+      if (panitia?.email) setResetEmail(panitia.email);
+    } catch(e) {}
+    setResetLoading(false);
+  }
+
+  async function handleOwnerReset() {
+    if (!resetPass || resetPass.length < 6) {
+      setResetMsg("❌ Password minimal 6 karakter.");
+      return;
+    }
+    setResetLoading(true);
+    try {
+      // Update email jika diisi
+      if (resetEmail) await updateEmailPanitia(resetModal.schoolId, resetEmail);
+      // Reset password
+      await ownerResetPassword(resetModal.schoolId, resetPass);
+      setResetMsg("✅ Password berhasil direset!");
+      setTimeout(() => { setResetModal(null); setResetMsg(""); }, 1500);
+    } catch(e) {
+      setResetMsg("❌ Gagal: " + (e.message || "Error tidak diketahui"));
+    }
+    setResetLoading(false);
   }
 
   async function handleDeleteSekolah(id, nama) {
@@ -268,6 +304,39 @@ export default function OwnerDashboard({ auth, onLogout }) {
 
   return (
     <div style={S.root}>
+      {resetModal && (
+        <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#0F172A",border:"1px solid #1E293B",borderRadius:20,padding:28,width:"100%",maxWidth:420}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+              <div>
+                <div style={{fontWeight:800,fontSize:16,color:"#E2E8F0"}}>🔑 Reset Password Panitia</div>
+                <div style={{fontSize:12,color:"#475569",marginTop:3}}>{resetModal.nama}</div>
+              </div>
+              <button style={{background:"none",border:"none",color:"#475569",fontSize:20,cursor:"pointer"}} onClick={()=>setResetModal(null)}>✕</button>
+            </div>
+            <div style={{marginBottom:14}}>
+              <label style={{fontSize:12,color:"#94A3B8",display:"block",marginBottom:6}}>📧 Email Panitia (untuk Forgot Password)</label>
+              <input type="email" placeholder="email@sekolah.com" value={resetEmail} onChange={e=>setResetEmail(e.target.value)}
+                style={{width:"100%",background:"#1E293B",border:"1px solid #334155",borderRadius:8,padding:"9px 12px",color:"#E2E8F0",fontSize:14,boxSizing:"border-box"}}/>
+              <div style={{fontSize:11,color:"#475569",marginTop:4}}>Simpan email agar panitia bisa reset sendiri via Forgot Password.</div>
+            </div>
+            <div style={{marginBottom:18}}>
+              <label style={{fontSize:12,color:"#94A3B8",display:"block",marginBottom:6}}>🔒 Password Baru</label>
+              <input type="text" placeholder="Minimal 6 karakter" value={resetPass} onChange={e=>setResetPass(e.target.value)}
+                style={{width:"100%",background:"#1E293B",border:"1px solid #334155",borderRadius:8,padding:"9px 12px",color:"#E2E8F0",fontSize:14,boxSizing:"border-box"}}/>
+            </div>
+            {resetMsg && (
+              <div style={{background:resetMsg.startsWith("✅")?"#052e16":"#2d0a0a",border:"1px solid "+(resetMsg.startsWith("✅")?"#16a34a":"#ef4444"),borderRadius:8,padding:"8px 12px",fontSize:13,marginBottom:14,color:resetMsg.startsWith("✅")?"#4ade80":"#f87171"}}>{resetMsg}</div>
+            )}
+            <div style={{display:"flex",gap:10}}>
+              <button style={{flex:1,background:"none",border:"1px solid #334155",borderRadius:10,padding:"10px",color:"#94A3B8",cursor:"pointer",fontSize:14}} onClick={()=>setResetModal(null)}>Batal</button>
+              <button style={{flex:2,background:"linear-gradient(135deg,#F59E0B,#D97706)",border:"none",borderRadius:10,padding:"10px",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:14,opacity:resetLoading?0.6:1}} onClick={handleOwnerReset} disabled={resetLoading}>
+                {resetLoading?"Memproses...":"🔑 Reset Password"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showModal && (
         <ModalLisensi
           sekolahList={sekolah}
@@ -391,6 +460,7 @@ export default function OwnerDashboard({ auth, onLogout }) {
                             {s.aktif
                               ? <button style={{ ...S.ghost, padding:"4px 10px", fontSize:11, color:"#F59E0B", borderColor:"#F59E0B44" }} onClick={() => handleToggle(s.id,false)}>Nonaktifkan</button>
                               : <button style={{ ...S.cta, padding:"4px 12px", fontSize:11 }} onClick={() => handleToggle(s.id,true)}>Aktifkan</button>}
+                            <button style={{ ...S.ghost, padding:"4px 9px", fontSize:11, color:"#F59E0B", borderColor:"#F59E0B33" }} onClick={() => openResetModal(s.id, s.nama)}>🔑 Reset</button>
                             <button style={{ ...S.ghost, padding:"4px 9px", fontSize:11, color:"#EF4444", borderColor:"#EF444433" }} onClick={() => handleDeleteSekolah(s.id,s.nama)}>🗑</button>
                           </div>
                         </td>
