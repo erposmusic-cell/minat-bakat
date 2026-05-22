@@ -114,6 +114,7 @@ export async function loginPanitia(username, password) {
     username: data.username, nama: data.nama,
     school_id: data.school_id, namaSekolah: sekolah.nama,
     kodeSekolah: sekolah.kode,
+    role: data.role,
     lisensiExpired:  lisensi.tgl_expired,
     lisensiSisaHari: sisaHari,
     lisensiPaket:    lisensi.paket,
