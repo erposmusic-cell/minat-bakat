@@ -151,6 +151,16 @@ export default function LoginPage({ onLogin }) {
               <p style={{ color:"#475569", fontSize:12, marginTop:8 }}>
                 Setelah mendaftar, akun akan diaktifkan oleh admin dalam 1×24 jam.
               </p>
+              {/* Info kontak WA */}
+              <a href="https://wa.me/6285156392033" target="_blank" rel="noopener noreferrer"
+                style={{ display:"flex", alignItems:"center", gap:10, background:"#052e16", border:"1px solid #16a34a44", borderRadius:10, padding:"10px 14px", marginTop:10, textDecoration:"none" }}>
+                <span style={{ fontSize:22 }}>💬</span>
+                <div>
+                  <div style={{ color:"#4ade80", fontWeight:700, fontSize:13 }}>Hubungi Admin via WhatsApp</div>
+                  <div style={{ color:"#16a34a", fontSize:12 }}>0851-5639-2033 · Konfirmasi pembayaran & aktivasi akun</div>
+                </div>
+                <span style={{ marginLeft:"auto", color:"#4ade80", fontSize:12, fontWeight:700 }}>Chat →</span>
+              </a>
             </div>
             {err && <div style={S.err}>{err}</div>}
             {ok  && <div style={S.ok}>{ok}</div>}
@@ -175,6 +185,22 @@ export default function LoginPage({ onLogin }) {
                   ))}
                 </div>
               </div>
+              {/* Kontak WA setelah pilih paket */}
+              {reg.paketId && (()=>{
+                const pk = PAKET_LIST.find(p => p.id === reg.paketId);
+                return pk ? (
+                  <a href={`https://wa.me/6285156392033?text=Halo%20admin%2C%20saya%20ingin%20berlangganan%20paket%20${encodeURIComponent(pk.nama)}%20(${encodeURIComponent(pk.hargaStr)})%20untuk%20sekolah%20kami.`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ display:"flex", alignItems:"center", gap:10, background:"#052e16", border:"1px solid #16a34a44", borderRadius:10, padding:"10px 14px", marginBottom:12, textDecoration:"none" }}>
+                    <span style={{ fontSize:20 }}>💬</span>
+                    <div>
+                      <div style={{ color:"#4ade80", fontWeight:700, fontSize:12 }}>Bayar paket {pk.nama} via WhatsApp</div>
+                      <div style={{ color:"#16a34a", fontSize:11 }}>{pk.hargaStr} · Klik untuk chat langsung dengan admin</div>
+                    </div>
+                    <span style={{ marginLeft:"auto", color:"#4ade80", fontSize:12, fontWeight:700 }}>Chat →</span>
+                  </a>
+                ) : null;
+              })()}
               <hr style={S.divider}/>
               <div style={S.fg}><label style={S.lbl}>Nama Sekolah *</label>
                 <input style={S.inp} value={reg.namaSekolah} onChange={e=>setReg({...reg,namaSekolah:e.target.value})} placeholder="SMA Negeri 1 Kota Anda"/></div>
