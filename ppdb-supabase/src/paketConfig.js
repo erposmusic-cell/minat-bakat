@@ -10,6 +10,7 @@ export const PAKET_LIST = [
     durasi:     365,
     maksSiswa:  100,
     maksKelas:  4,
+    maksAdmin:  1,
     harga:      250000,
     hargaStr:   "Rp 250.000 / tahun",
     deskripsi:  "Cocok untuk sekolah kecil",
@@ -22,6 +23,7 @@ export const PAKET_LIST = [
     durasi:     365,
     maksSiswa:  200,
     maksKelas:  6,
+    maksAdmin:  2,
     harga:      350000,
     hargaStr:   "Rp 350.000 / tahun",
     deskripsi:  "Pilihan terbaik untuk sekolah berkembang",
@@ -34,6 +36,7 @@ export const PAKET_LIST = [
     durasi:     365,
     maksSiswa:  350,
     maksKelas:  10,
+    maksAdmin:  4,
     harga:      450000,
     hargaStr:   "Rp 450.000 / tahun",
     deskripsi:  "Untuk sekolah menengah aktif",
@@ -46,6 +49,7 @@ export const PAKET_LIST = [
     durasi:     365,
     maksSiswa:  500,
     maksKelas:  15,
+    maksAdmin:  6,
     harga:      600000,
     hargaStr:   "Rp 600.000 / tahun",
     deskripsi:  "Untuk sekolah besar & aktif",
@@ -58,6 +62,7 @@ export const PAKET_LIST = [
     durasi:     null,        // null = unlimited
     maksSiswa:  null,        // null = unlimited
     maksKelas:  null,        // null = unlimited
+    maksAdmin:  null,        // null = unlimited
     harga:      1000000,
     hargaStr:   "Rp 1.000.000 (selamanya)",
     deskripsi:  "Akses penuh tanpa batas waktu",
