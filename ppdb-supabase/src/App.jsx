@@ -71,6 +71,7 @@ import {
   fetchSekolahByKode,
   getAdminSekolah, tambahAdmin, hapusAdmin, cekKuotaAdmin,
   getLogoSekolah, uploadLogoSekolah,
+  getTahunAjaran, saveTahunAjaran,
 } from "./supabaseClient";
 import LoginPage from "./LoginPage";
 import OwnerDashboard from "./OwnerDashboard";
@@ -460,7 +461,7 @@ function doExcelExport(daftar, kelas) {
   XLSX.writeFile(wb,"PPDB_"+new Date().toLocaleDateString("id-ID").replace(/\//g,"-")+".xlsx");
 }
 
-function doPrintSiswa(siswa, logoBase64, namaSekolah) {
+function doPrintSiswa(siswa, logoBase64, namaSekolah, tahunAjaran) {
   const t0 = siswa.top[0];
   const bars = CAT.map(c=>`
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
@@ -501,7 +502,7 @@ function doPrintSiswa(siswa, logoBase64, namaSekolah) {
     <div style="text-align:center;margin-bottom:14px">
       ${logoBase64 ? `<img src="${logoBase64}" style="width:72px;height:72px;object-fit:contain;display:block;margin:0 auto 6px" />` : ""}
       ${namaSekolah ? `<div style="font-size:16px;font-weight:900;color:#1e3a5f;letter-spacing:0.5px;line-height:1.3">${namaSekolah}</div>` : ""}
-      <div style="font-size:12px;color:#64748b;margin-top:2px">Laporan Asesmen Bakat &amp; Minat · PPDB 2025/2026</div>
+      <div style="font-size:12px;color:#64748b;margin-top:2px">Laporan Asesmen Bakat &amp; Minat · PPDB ${tahunAjaran || "2025/2026"}</div>
     </div>
     <!-- garis pemisah tipis antara kop dan data peserta -->
     <div style="border-top:1px dashed #cbd5e1;margin-bottom:12px"></div>
@@ -570,6 +571,7 @@ export default function App() {
   const [gbShuffled, setGbShuffled] = useState([]);
   const [siswaSchool, setSiswaSchool] = useState(null);
   const [logoSekolah, setLogoSekolah] = useState(null); // base64 logo
+  const [tahunAjaran, setTahunAjaran] = useState(null); // e.g. '2025/2026'
 
   // Wrapper setPhase & setTab yang sekaligus update URL
   function setPhase(p, t) {
@@ -600,18 +602,20 @@ export default function App() {
     setDbLoading(true); setDbError(null);
     try {
       const sid = auth.school_id;
-      const [kelasData, targetData, siswaData, soalData, logoData] = await Promise.all([
+      const [kelasData, targetData, siswaData, soalData, logoData, tahunAjaranData] = await Promise.all([
         fetchKelas(sid),
         fetchTarget(sid),
         fetchSiswa(sid),
         fetchSoal(sid),
         getLogoSekolah(sid),
+        getTahunAjaran(sid),
       ]);
       setKelas(kelasData.length > 0 ? kelasData : DEFAULT_KELAS);
       setTarget(targetData);
       setDaftar(siswaData);
       setQuestions(soalData.length > 0 ? soalData : QUESTIONS);
       if (logoData) setLogoSekolah(logoData);
+      if (tahunAjaranData) setTahunAjaran(tahunAjaranData);
       setSetupDone(true);
     } catch(e) {
       setDbError("Gagal memuat data: " + e.message);
@@ -724,6 +728,7 @@ export default function App() {
     <LoginPage onLogin={(role, userData) => {
       setAuth({...userData, role});
       if (userData.logoSekolah) setLogoSekolah(userData.logoSekolah);
+      if (userData.tahunAjaran) setTahunAjaran(userData.tahunAjaran);
       const target = role==="panitia" ? "dashboard" : "landing";
       setPhaseRaw(target);
       navigate(target);
@@ -834,6 +839,8 @@ export default function App() {
             dbLoading={dbLoading}
             logoSekolah={logoSekolah}
             onSaveLogo={async (base64) => { await uploadLogoSekolah(auth.school_id, base64); setLogoSekolah(base64); }}
+            tahunAjaran={tahunAjaran}
+            onSaveTahun={async (t) => { await saveTahunAjaran(auth.school_id, t); setTahunAjaran(t); }}
           />
         )}
       </main>
@@ -1211,13 +1218,24 @@ function Asesmen({questions,current,answers,animIn,onAnswer,onNext,onPrev,onSele
 // ══════════════════════════════════════════
 // PENGATURAN LOGO SEKOLAH
 // ══════════════════════════════════════════
-function PengaturanLogo({ auth, logoSekolah, onSaveLogo }) {
+function PengaturanLogo({ auth, logoSekolah, onSaveLogo, tahunAjaran, onSaveTahun }) {
   const [preview, setPreview] = useState(logoSekolah || null);
   const [saving, setSaving] = useState(false);
+  const [savingTahun, setSavingTahun] = useState(false);
   const [msg, setMsg] = useState("");
+  const [msgTahun, setMsgTahun] = useState("");
+  const [tahunVal, setTahunVal] = useState(tahunAjaran || "");
   const fileRef = useRef();
 
   useEffect(() => { setPreview(logoSekolah || null); }, [logoSekolah]);
+  useEffect(() => { setTahunVal(tahunAjaran || ""); }, [tahunAjaran]);
+
+  // Generate pilihan tahun ajaran: 3 tahun ke belakang s/d 3 tahun ke depan
+  const currentYear = new Date().getFullYear();
+  const tahunOptions = Array.from({length: 7}, (_, i) => {
+    const y = currentYear - 2 + i;
+    return `${y}/${y+1}`;
+  });
 
   function handleFile(e) {
     const file = e.target.files[0];
@@ -1250,42 +1268,78 @@ function PengaturanLogo({ auth, logoSekolah, onSaveLogo }) {
     setSaving(false);
   }
 
+  async function handleSaveTahun() {
+    if (!tahunVal) { setMsgTahun("❌ Pilih tahun ajaran."); return; }
+    setSavingTahun(true); setMsgTahun("");
+    try {
+      await onSaveTahun(tahunVal);
+      setMsgTahun("✅ Tahun ajaran disimpan!");
+    } catch(e) { setMsgTahun("❌ Gagal simpan: " + e.message); }
+    setSavingTahun(false);
+  }
+
   return (
-    <div style={{maxWidth:520}}>
-      <h2 style={S.cardTitle}>🏫 Logo Sekolah</h2>
-      <p style={{color:"#475569",fontSize:13,marginBottom:20}}>
-        Logo akan muncul di bagian atas setiap cetak laporan asesmen siswa.
-        Format: JPG/PNG/WebP · Maks 500KB · Disarankan persegi (1:1).
-      </p>
-      <div style={{background:"#0F172A",border:"1px solid #1E293B",borderRadius:14,padding:24,display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
-        {preview ? (
-          <img src={preview} alt="Logo Sekolah"
-            style={{width:120,height:120,objectFit:"contain",borderRadius:12,border:"2px solid #1E3A5F",background:"#fff",padding:6}} />
-        ) : (
-          <div style={{width:120,height:120,borderRadius:12,border:"2px dashed #334155",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:6,color:"#475569"}}>
-            <span style={{fontSize:36}}>🏫</span>
-            <span style={{fontSize:11}}>Belum ada logo</span>
+    <div style={{maxWidth:560,display:"flex",flexDirection:"column",gap:20}}>
+      <h2 style={S.cardTitle}>🏫 Identitas Sekolah</h2>
+
+      {/* ── Tahun Ajaran ── */}
+      <div style={{background:"#0F172A",border:"1px solid #1E293B",borderRadius:14,padding:20}}>
+        <div style={{fontWeight:700,fontSize:14,color:"#E2E8F0",marginBottom:4}}>📅 Tahun Ajaran PPDB</div>
+        <div style={{fontSize:12,color:"#475569",marginBottom:14}}>Muncul di kop surat hasil cetak asesmen siswa.</div>
+        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+          <select
+            value={tahunVal}
+            onChange={e=>setTahunVal(e.target.value)}
+            style={{...S.inp, width:"auto", minWidth:160, cursor:"pointer"}}
+          >
+            <option value="">-- Pilih Tahun --</option>
+            {tahunOptions.map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          <button style={{...S.cta,padding:"9px 20px",fontSize:14,opacity:savingTahun?0.6:1}} onClick={handleSaveTahun} disabled={savingTahun}>
+            {savingTahun?"Menyimpan...":"💾 Simpan"}
+          </button>
+        </div>
+        {msgTahun && (
+          <div style={{background:msgTahun.startsWith("✅")?"#052e16":"#450A0A",color:msgTahun.startsWith("✅")?"#4ade80":"#F87171",borderRadius:8,padding:"7px 12px",fontSize:13,marginTop:10}}>
+            {msgTahun}
           </div>
         )}
+      </div>
+
+      {/* ── Logo Sekolah ── */}
+      <div style={{background:"#0F172A",border:"1px solid #1E293B",borderRadius:14,padding:20}}>
+        <div style={{fontWeight:700,fontSize:14,color:"#E2E8F0",marginBottom:4}}>🖼️ Logo Sekolah</div>
+        <div style={{fontSize:12,color:"#475569",marginBottom:14}}>Format: JPG/PNG/WebP · Maks 500KB · Disarankan persegi (1:1).</div>
+        <div style={{display:"flex",alignItems:"center",gap:20,flexWrap:"wrap"}}>
+          {preview ? (
+            <img src={preview} alt="Logo Sekolah"
+              style={{width:90,height:90,objectFit:"contain",borderRadius:10,border:"2px solid #1E3A5F",background:"#fff",padding:5,flexShrink:0}} />
+          ) : (
+            <div style={{width:90,height:90,borderRadius:10,border:"2px dashed #334155",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:4,color:"#475569",flexShrink:0}}>
+              <span style={{fontSize:28}}>🏫</span>
+              <span style={{fontSize:10}}>Belum ada logo</span>
+            </div>
+          )}
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleFile}/>
+            <button style={{...S.ghost,marginTop:0}} onClick={()=>fileRef.current.click()}>📁 Pilih Gambar</button>
+            <button style={{...S.cta,padding:"9px 20px",fontSize:14,opacity:saving?0.6:1}} onClick={handleSave} disabled={saving}>
+              {saving?"Menyimpan...":"💾 Simpan Logo"}
+            </button>
+            {preview && (
+              <button style={{...S.ghost,marginTop:0,color:"#F87171",borderColor:"#F8717155"}} onClick={handleHapus} disabled={saving}>
+                🗑 Hapus Logo
+              </button>
+            )}
+          </div>
+        </div>
         {msg && (
-          <div style={{background:msg.startsWith("✅")?"#052e16":"#450A0A",color:msg.startsWith("✅")?"#4ade80":"#F87171",borderRadius:8,padding:"8px 14px",fontSize:13,width:"100%",textAlign:"center"}}>
+          <div style={{background:msg.startsWith("✅")?"#052e16":"#450A0A",color:msg.startsWith("✅")?"#4ade80":"#F87171",borderRadius:8,padding:"7px 12px",fontSize:13,marginTop:12}}>
             {msg}
           </div>
         )}
-        <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleFile}/>
-        <div style={{display:"flex",gap:10,flexWrap:"wrap",justifyContent:"center"}}>
-          <button style={{...S.ghost,marginTop:0}} onClick={()=>fileRef.current.click()}>
-            📁 Pilih Gambar
-          </button>
-          <button style={{...S.cta,padding:"9px 20px",fontSize:14,opacity:saving?0.6:1}} onClick={handleSave} disabled={saving}>
-            {saving?"Menyimpan...":"💾 Simpan Logo"}
-          </button>
-          {preview && (
-            <button style={{...S.ghost,marginTop:0,color:"#F87171",borderColor:"#F8717155"}} onClick={handleHapus} disabled={saving}>
-              🗑 Hapus Logo
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );
@@ -1616,7 +1670,7 @@ function Hasil({siswa,onBaru,onDaftar,auth}) {
       )}
       <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap",paddingBottom:8}}>
         {auth.role==="panitia"&&<button style={S.ghost} onClick={onDaftar}>← Data Siswa</button>}
-        <button style={S.ghost} onClick={()=>doPrintSiswa(siswa, logoSekolah, auth?.namaSekolah)}>🖨 Cetak / PDF</button>
+        <button style={S.ghost} onClick={()=>doPrintSiswa(siswa, logoSekolah, auth?.namaSekolah, tahunAjaran)}>🖨 Cetak / PDF</button>
         <button style={S.cta} onClick={onBaru}>Asesmen Baru ✦</button>
       </div>
     </div>
@@ -1658,7 +1712,7 @@ function KodeBanner({kode, namaSekolah}) {
 // ══════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════
-function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDetail,onBaru,onExport,onSetupUlang,onSaveKelas,onDeleteKelas,onUpdateKelasSiswa,onRefresh,dbLoading,logoSekolah,onSaveLogo}) {
+function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDetail,onBaru,onExport,onSetupUlang,onSaveKelas,onDeleteKelas,onUpdateKelasSiswa,onRefresh,dbLoading,logoSekolah,onSaveLogo,tahunAjaran,onSaveTahun}) {
   const isUtama = auth?.role_admin === "admin_utama";
   if(tab==="data")  return <DaftarSiswa daftar={daftar} kelas={kelas} onDetail={onDetail} onBaru={onBaru} onExport={onExport} onUpdateKelasSiswa={onUpdateKelasSiswa} isUtama={isUtama} logoSekolah={logoSekolah} auth={auth}/>;
   if(tab==="soal")  return (
@@ -1671,7 +1725,7 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
   );
   if(tab==="kelas") return <ManajemenKelas kelas={kelas} daftar={daftar} setDaftar={setDaftar} target={target} onSaveKelas={onSaveKelas} onDeleteKelas={onDeleteKelas} dbLoading={dbLoading}/>;
   if(tab==="admin" && isUtama) return <KelolAdmin auth={auth}/>;
-  if(tab==="logo"  && isUtama) return <PengaturanLogo auth={auth} logoSekolah={logoSekolah} onSaveLogo={onSaveLogo}/>;
+  if(tab==="logo"  && isUtama) return <PengaturanLogo auth={auth} logoSekolah={logoSekolah} onSaveLogo={onSaveLogo} tahunAjaran={tahunAjaran} onSaveTahun={onSaveTahun}/>;
 
   const counts={}; CAT.forEach(c=>counts[c.id]=0);
   daftar.forEach(s=>{if(s.top[0])counts[s.top[0].id]++;});
@@ -1917,7 +1971,7 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,i
         <div style={{display:"flex",gap:7}}>
           <button style={S.ghost} onClick={onBaru}>+ Siswa Baru</button>
           <button style={{...S.cta,padding:"8px 14px",fontSize:13}} onClick={onExport} disabled={daftar.length===0}>📥 Excel</button>
-          <button style={S.ghost} onClick={()=>daftar.forEach(s=>doPrintSiswa(s, logoSekolah, auth?.namaSekolah))} disabled={daftar.length===0}>🖨 Cetak</button>
+          <button style={S.ghost} onClick={()=>daftar.forEach(s=>doPrintSiswa(s, logoSekolah, auth?.namaSekolah, tahunAjaran))} disabled={daftar.length===0}>🖨 Cetak</button>
         </div>
       </div>
       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -1958,7 +2012,7 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,i
                     <td style={S.td}>
                       <div style={{display:"flex",gap:5}}>
                         <button style={S.detBtn} onClick={()=>onDetail(s)}>Detail</button>
-                        <button style={{...S.detBtn,color:"#10B981",borderColor:"#10B98155"}} onClick={()=>doPrintSiswa(s, logoSekolah, auth?.namaSekolah)}>PDF</button>
+                        <button style={{...S.detBtn,color:"#10B981",borderColor:"#10B98155"}} onClick={()=>doPrintSiswa(s, logoSekolah, auth?.namaSekolah, tahunAjaran)}>PDF</button>
                         {isUtama && (
                           <button style={{...S.detBtn,color:"#EF4444",borderColor:"#EF444433"}}
                             onClick={async()=>{ if(!window.confirm("Hapus siswa ini?"))return; await deleteSiswa(s.id); setDaftar(p=>p.filter(x=>x.id!==s.id)); }}>🗑</button>
