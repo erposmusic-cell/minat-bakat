@@ -487,9 +487,17 @@ export default function App() {
     setAnimIn(false);
     setTimeout(()=>{
       setAnswers(prev=>({...prev,[qid]:val}));
-      if(current<(shuffled.length||QUESTIONS.length)-1) setCurrent(c=>c+1);
+      // Tidak auto-pindah soal agar siswa bisa mengubah jawaban
       setAnimIn(true);
     },180);
+  }
+
+  function handleNext() {
+    const maxLen = shuffled.length || QUESTIONS.length;
+    if (current < maxLen - 1) {
+      setAnimIn(false);
+      setTimeout(() => { setCurrent(c => c + 1); setAnimIn(true); }, 180);
+    }
   }
 
   async function handleSelesai() {
@@ -630,6 +638,7 @@ export default function App() {
             questions={shuffled.length > 0 ? shuffled : QUESTIONS}
             current={current} answers={answers} animIn={animIn}
             onAnswer={handleAnswer}
+            onNext={handleNext}
             onPrev={() => setCurrent(c => Math.max(0, c - 1))}
             onSelesai={handleSelesai}
           />
@@ -923,11 +932,13 @@ function FormSiswa({siswa,onChange,onLanjut,siswaSchool}) {
 // ══════════════════════════════════════════
 // ASESMEN
 // ══════════════════════════════════════════
-function Asesmen({questions,current,answers,animIn,onAnswer,onPrev,onSelesai}) {
+function Asesmen({questions,current,answers,animIn,onAnswer,onNext,onPrev,onSelesai}) {
   const q = questions[current];
   const cat = CAT.find(c=>c.id===q.cat);
   const progress = (Object.keys(answers).length/questions.length)*100;
   const allDone  = Object.keys(answers).length===questions.length;
+  const sudahJawab = answers[q.id] !== undefined;
+  const isLast = current === questions.length - 1;
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14,maxWidth:700,margin:"0 auto"}}>
       <div style={{height:6,background:"#1E293B",borderRadius:99,overflow:"hidden"}}>
@@ -959,10 +970,20 @@ function Asesmen({questions,current,answers,animIn,onAnswer,onPrev,onSelesai}) {
             </button>
           ))}
         </div>
+        {sudahJawab && !isLast && (
+          <button
+            style={{...S.cta,width:"100%",marginTop:16,fontSize:15}}
+            onClick={onNext}
+          >
+            Lanjut →
+          </button>
+        )}
       </div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <button style={S.ghost} onClick={onPrev} disabled={current===0}>← Sebelumnya</button>
-        <span style={{fontSize:11,color:"#475569"}}>Klik pilihan untuk lanjut otomatis</span>
+        <span style={{fontSize:11,color:"#475569"}}>
+          {sudahJawab ? "Kamu bisa mengubah jawaban sebelum lanjut" : "Pilih salah satu jawaban"}
+        </span>
         {allDone&&<button style={{...S.cta,padding:"9px 20px",fontSize:14}} onClick={onSelesai}>Lihat Hasil ✦</button>}
       </div>
       <div style={{display:"flex",flexWrap:"wrap",gap:3,justifyContent:"center"}}>
