@@ -404,3 +404,56 @@ export async function fetchSekolahByKode(kode) {
 
   return data;
 }
+
+// ══════════════════════════════════════════
+// RESET PASSWORD PANITIA
+// ══════════════════════════════════════════
+
+/** Owner: reset password panitia langsung */
+export async function ownerResetPassword(schoolId, passwordBaru) {
+  const { data, error } = await supabase.rpc("owner_reset_password", {
+    p_school_id: schoolId,
+    p_password_baru: passwordBaru,
+  });
+  if (error) throw error;
+  return data;
+}
+
+/** Panitia: minta reset via email (generate token) */
+export async function requestResetPassword(email) {
+  const { data, error } = await supabase.rpc("request_reset_password", {
+    p_email: email,
+  });
+  if (error) throw error;
+  return data?.[0] || null;
+}
+
+/** Panitia: verifikasi token dan ganti password */
+export async function verifyResetToken(token, passwordBaru) {
+  const { data, error } = await supabase.rpc("verify_reset_token", {
+    p_token: token,
+    p_password_baru: passwordBaru,
+  });
+  if (error) throw error;
+  return data?.[0] || null;
+}
+
+/** Fetch data panitia untuk sekolah tertentu */
+export async function fetchPanitiaBySchool(schoolId) {
+  const { data, error } = await supabase
+    .from("panitia")
+    .select("id, username, nama, email, school_id")
+    .eq("school_id", schoolId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/** Update email panitia */
+export async function updateEmailPanitia(schoolId, email) {
+  const { error } = await supabase
+    .from("panitia")
+    .update({ email })
+    .eq("school_id", schoolId);
+  if (error) throw error;
+}
