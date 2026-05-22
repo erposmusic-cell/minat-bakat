@@ -84,7 +84,7 @@ export async function loginPanitia(username, password) {
   if (!data) return null;
 
   const { data: sekolah } = await supabase
-    .from("sekolah").select("aktif, nama, kode, logo").eq("id", data.school_id).maybeSingle();
+    .from("sekolah").select("aktif, nama, kode, logo, tahun_ajaran").eq("id", data.school_id).maybeSingle();
 
   if (!sekolah?.aktif) {
     throw new Error("Akun sekolah belum diaktifkan. Silakan hubungi admin.");
@@ -116,6 +116,7 @@ export async function loginPanitia(username, password) {
     kodeSekolah: sekolah.kode,
     role: data.role,
     logoSekolah: sekolah.logo || null,
+    tahunAjaran: sekolah.tahun_ajaran || null,
     lisensiExpired:  lisensi.tgl_expired,
     lisensiSisaHari: sisaHari,
     lisensiPaket:    lisensi.paket,
@@ -500,6 +501,31 @@ export async function hapusAdmin(adminId, schoolId) {
 // ══════════════════════════════════════════
 // LOGO SEKOLAH
 // ══════════════════════════════════════════
+
+// ══════════════════════════════════════════
+// TAHUN AJARAN
+// ══════════════════════════════════════════
+
+/** Ambil tahun ajaran sekolah */
+export async function getTahunAjaran(schoolId) {
+  const { data, error } = await supabase
+    .from("sekolah")
+    .select("tahun_ajaran")
+    .eq("id", schoolId)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.tahun_ajaran || null;
+}
+
+/** Simpan tahun ajaran sekolah */
+export async function saveTahunAjaran(schoolId, tahun) {
+  const { error } = await supabase
+    .from("sekolah")
+    .update({ tahun_ajaran: tahun })
+    .eq("id", schoolId);
+  if (error) throw error;
+}
+
 
 /** Ambil logo sekolah (base64) */
 export async function getLogoSekolah(schoolId) {
