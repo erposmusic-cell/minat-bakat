@@ -894,15 +894,15 @@ function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab,questions}) {
                 </span>
               );
             })()}
-            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="dashboard"?S.navAct:{})}} onClick={()=>setPhase("dashboard","dashboard")}>📊</button>
-            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="kelas"?S.navAct:{})}} onClick={()=>setPhase("dashboard","kelas")}>🏫</button>
+            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="dashboard"?S.navAct:{})}} onClick={()=>setPhase("dashboard","dashboard")}>Dashboard</button>
+            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="kelas"?S.navAct:{})}} onClick={()=>setPhase("dashboard","kelas")}>Kelas</button>
             <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="data"?S.navAct:{})}} onClick={()=>setPhase("dashboard","data")}>Data</button>
-            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="soal"?S.navAct:{})}} onClick={()=>setPhase("dashboard","soal")}>📝</button>
+            <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="soal"?S.navAct:{})}} onClick={()=>setPhase("dashboard","soal")}>Soal</button>
             {auth?.role_admin==="admin_utama" && (
-              <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="admin"?S.navAct:{})}} onClick={()=>setPhase("dashboard","admin")}>👥</button>
+              <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="admin"?S.navAct:{})}} onClick={()=>setPhase("dashboard","admin")}>Admin</button>
             )}
             {auth?.role_admin==="admin_utama" && (
-              <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="logo"?S.navAct:{})}} onClick={()=>setPhase("dashboard","logo")}>🖼️</button>
+              <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="logo"?S.navAct:{})}} onClick={()=>setPhase("dashboard","logo")}>Identitas</button>
             )}
           </>}
           <button style={S.navBtn} onClick={()=>setPhase("landing")}>+ Asesmen</button>
