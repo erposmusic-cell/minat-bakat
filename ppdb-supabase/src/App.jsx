@@ -692,6 +692,18 @@ function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab,questions}) {
                 {copied ? "✅ Tersalin!" : `🔑 ${auth.kodeSekolah}`}
               </button>
             )}
+            {auth.lisensiExpired && (()=>{
+              const sisa = auth.lisensiSisaHari;
+              const col  = sisa <= 7 ? "#F59E0B" : sisa <= 30 ? "#60A5FA" : "#4ade80";
+              const bg   = sisa <= 7 ? "#451A03" : "#0F172A";
+              const tgl  = new Date(auth.lisensiExpired).toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"});
+              return (
+                <span title={`Lisensi berlaku hingga ${tgl}`}
+                  style={{...S.navBtn, background:bg, color:col, borderColor:col+"44", fontSize:11, fontWeight:700, cursor:"default"}}>
+                  🛡️ Lisensi: {sisa}h ({tgl})
+                </span>
+              );
+            })()}
             <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="dashboard"?S.navAct:{})}} onClick={()=>setPhase("dashboard","dashboard")}>📊</button>
             <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="kelas"?S.navAct:{})}} onClick={()=>setPhase("dashboard","kelas")}>🏫</button>
             <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="data"?S.navAct:{})}} onClick={()=>setPhase("dashboard","data")}>Data</button>
