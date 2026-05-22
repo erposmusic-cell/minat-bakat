@@ -69,6 +69,7 @@ import {
   updateSoal,
   deleteSoal,
   fetchSekolahByKode,
+  getAdminSekolah, tambahAdmin, hapusAdmin, cekKuotaAdmin,
 } from "./supabaseClient";
 import LoginPage from "./LoginPage";
 import OwnerDashboard from "./OwnerDashboard";
@@ -867,6 +868,9 @@ function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab,questions}) {
             <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="kelas"?S.navAct:{})}} onClick={()=>setPhase("dashboard","kelas")}>🏫</button>
             <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="data"?S.navAct:{})}} onClick={()=>setPhase("dashboard","data")}>Data</button>
             <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="soal"?S.navAct:{})}} onClick={()=>setPhase("dashboard","soal")}>📝</button>
+            {auth?.role_admin==="admin_utama" && (
+              <button style={{...S.navBtn,...(phase==="dashboard"&&tab==="admin"?S.navAct:{})}} onClick={()=>setPhase("dashboard","admin")}>👥</button>
+            )}
           </>}
           <button style={S.navBtn} onClick={()=>setPhase("landing")}>+ Asesmen</button>
           <button style={{...S.navBtn,background:"#1E293B"}} onClick={()=>setAuth(null)}>Keluar</button>
@@ -1175,6 +1179,153 @@ function Asesmen({questions,current,answers,animIn,onAnswer,onNext,onPrev,onSele
   );
 }
 
+
+// ══════════════════════════════════════════
+// KELOLA ADMIN
+// ══════════════════════════════════════════
+function KelolAdmin({ auth }) {
+  const [adminList, setAdminList] = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [showForm, setShowForm]   = useState(false);
+  const [form, setForm]           = useState({ username:"", password:"", nama:"", email:"" });
+  const [msg, setMsg]             = useState("");
+  const [kuota, setKuota]         = useState(0);
+
+  const paket = auth?.paket || "starter";
+  const MAKS = { starter:1, growth:2, professional:4, enterprise:6, lifetime:null };
+  const maksAdmin = MAKS[paket] ?? 1;
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const list = await getAdminSekolah(auth.school_id);
+      const admins = list.filter(a => a.role === "admin");
+      setAdminList(list);
+      setKuota(admins.length);
+    } catch(e) { setMsg("❌ Gagal memuat: " + e.message); }
+    setLoading(false);
+  }
+
+  async function handleTambah() {
+    if (!form.username || !form.password || !form.nama) { setMsg("❌ Nama, username & password wajib diisi."); return; }
+    if (form.password.length < 6) { setMsg("❌ Password minimal 6 karakter."); return; }
+    if (maksAdmin !== null && kuota >= maksAdmin) { setMsg(`❌ Paket ${paket} hanya bisa tambah ${maksAdmin} admin.`); return; }
+    setLoading(true); setMsg("");
+    try {
+      const res = await tambahAdmin({
+        schoolId: auth.school_id, username: form.username,
+        password: form.password, nama: form.nama,
+        email: form.email, dibuatOleh: auth.id,
+      });
+      if (res?.berhasil) {
+        setMsg("✅ Admin berhasil ditambahkan!");
+        setForm({ username:"", password:"", nama:"", email:"" });
+        setShowForm(false);
+        await load();
+      } else { setMsg("❌ " + (res?.pesan || "Gagal.")); }
+    } catch(e) { setMsg("❌ " + e.message); }
+    setLoading(false);
+  }
+
+  async function handleHapus(adminId, nama) {
+    if (!window.confirm(`Hapus admin "${nama}"?`)) return;
+    setLoading(true);
+    try {
+      await hapusAdmin(adminId, auth.school_id);
+      setMsg("✅ Admin dihapus.");
+      await load();
+    } catch(e) { setMsg("❌ " + e.message); }
+    setLoading(false);
+  }
+
+  const sisaKuota = maksAdmin === null ? "∞" : maksAdmin - kuota;
+
+  return (
+    <div style={{maxWidth:680,margin:"0 auto",display:"flex",flexDirection:"column",gap:16}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <h2 style={{fontSize:18,fontWeight:800,color:"#E2E8F0",margin:0}}>👥 Kelola Admin</h2>
+          <div style={{fontSize:12,color:"#475569",marginTop:4}}>
+            Paket <b style={{color:"#60A5FA"}}>{paket}</b> · Sisa kuota:
+            <b style={{color: sisaKuota===0?"#EF4444":"#4ade80",marginLeft:4}}>{sisaKuota} admin</b>
+          </div>
+        </div>
+        {(maksAdmin===null||kuota<maksAdmin) && (
+          <button style={{...S.cta,padding:"8px 16px",fontSize:13}} onClick={()=>{setShowForm(s=>!s);setMsg("");}}>
+            {showForm?"✕ Batal":"➕ Tambah Admin"}
+          </button>
+        )}
+      </div>
+
+      {msg && (
+        <div style={{background:msg.startsWith("✅")?"#052e16":"#2d0a0a",border:"1px solid "+(msg.startsWith("✅")?"#16a34a":"#ef4444"),borderRadius:10,padding:"10px 14px",fontSize:13,color:msg.startsWith("✅")?"#4ade80":"#f87171"}}>
+          {msg}
+        </div>
+      )}
+
+      {showForm && (
+        <div style={{background:"#0F172A",border:"1px solid #1E3A5F",borderRadius:14,padding:20}}>
+          <div style={{fontWeight:700,fontSize:14,color:"#60A5FA",marginBottom:14}}>➕ Tambah Admin Baru</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+            <div>
+              <label style={{fontSize:12,color:"#94A3B8",display:"block",marginBottom:5}}>Nama Lengkap *</label>
+              <input style={{...S.inp}} placeholder="Nama admin" value={form.nama} onChange={e=>setForm({...form,nama:e.target.value})}/>
+            </div>
+            <div>
+              <label style={{fontSize:12,color:"#94A3B8",display:"block",marginBottom:5}}>Email</label>
+              <input style={{...S.inp}} type="email" placeholder="email@sekolah.com" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/>
+            </div>
+            <div>
+              <label style={{fontSize:12,color:"#94A3B8",display:"block",marginBottom:5}}>Username *</label>
+              <input style={{...S.inp}} placeholder="Username unik" value={form.username} onChange={e=>setForm({...form,username:e.target.value})}/>
+            </div>
+            <div>
+              <label style={{fontSize:12,color:"#94A3B8",display:"block",marginBottom:5}}>Password *</label>
+              <input style={{...S.inp}} type="password" placeholder="Min. 6 karakter" value={form.password} onChange={e=>setForm({...form,password:e.target.value})}/>
+            </div>
+          </div>
+          <div style={{background:"#0B1120",borderRadius:10,padding:"10px 14px",fontSize:12,color:"#475569",marginBottom:12}}>
+            ℹ️ Admin tambahan bisa: lihat & input siswa, cetak PDF, edit kelas & soal. Tidak bisa: hapus siswa, setup sistem, kelola admin lain.
+          </div>
+          <button style={{...S.cta,width:"100%"}} onClick={handleTambah} disabled={loading}>
+            {loading?"Menyimpan...":"Simpan Admin →"}
+          </button>
+        </div>
+      )}
+
+      {loading && !showForm ? (
+        <div style={{textAlign:"center",color:"#475569",padding:24}}>Memuat...</div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {adminList.map(a => (
+            <div key={a.id} style={{background:"#0F172A",border:"1px solid "+(a.role==="admin_utama"?"#3B82F633":"#1E293B"),borderRadius:12,padding:"14px 18px",display:"flex",alignItems:"center",gap:14}}>
+              <div style={{width:38,height:38,borderRadius:10,background:a.role==="admin_utama"?"#1E3A5F":"#1E293B",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+                {a.role==="admin_utama"?"👑":"👤"}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:700,color:"#E2E8F0",fontSize:14}}>{a.nama}</div>
+                <div style={{fontSize:12,color:"#475569",marginTop:2}}>@{a.username} {a.email?`· ${a.email}`:""}</div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+                <span style={{background:a.role==="admin_utama"?"#1E3A5F":"#1E293B",color:a.role==="admin_utama"?"#60A5FA":"#94A3B8",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700}}>
+                  {a.role==="admin_utama"?"Admin Utama":"Admin"}
+                </span>
+                {a.role==="admin" && (
+                  <button style={{...S.ghost,padding:"4px 10px",fontSize:12,color:"#EF4444",borderColor:"#EF444433",marginTop:0}} onClick={()=>handleHapus(a.id,a.nama)}>
+                    Hapus
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════
 // ASESMEN GAYA BELAJAR
 // ══════════════════════════════════════════
@@ -1398,7 +1549,8 @@ function KodeBanner({kode, namaSekolah}) {
 // DASHBOARD
 // ══════════════════════════════════════════
 function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDetail,onBaru,onExport,onSetupUlang,onSaveKelas,onDeleteKelas,onUpdateKelasSiswa,onRefresh,dbLoading}) {
-  if(tab==="data")  return <DaftarSiswa daftar={daftar} kelas={kelas} onDetail={onDetail} onBaru={onBaru} onExport={onExport} onUpdateKelasSiswa={onUpdateKelasSiswa}/>;
+  const isUtama = auth?.role_admin === "admin_utama";
+  if(tab==="data")  return <DaftarSiswa daftar={daftar} kelas={kelas} onDetail={onDetail} onBaru={onBaru} onExport={onExport} onUpdateKelasSiswa={onUpdateKelasSiswa} isUtama={isUtama}/>;
   if(tab==="soal")  return (
     <ManajemenSoal
       soal={questions}
@@ -1408,6 +1560,7 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
     />
   );
   if(tab==="kelas") return <ManajemenKelas kelas={kelas} daftar={daftar} setDaftar={setDaftar} target={target} onSaveKelas={onSaveKelas} onDeleteKelas={onDeleteKelas} dbLoading={dbLoading}/>;
+  if(tab==="admin" && isUtama) return <KelolAdmin auth={auth}/>;
 
   const counts={}; CAT.forEach(c=>counts[c.id]=0);
   daftar.forEach(s=>{if(s.top[0])counts[s.top[0].id]++;});
@@ -1428,7 +1581,9 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
         </div>
         <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
           <button style={S.ghost} onClick={onRefresh} disabled={dbLoading}>🔄 {dbLoading?"Memuat...":"Refresh"}</button>
-          <button style={S.ghost} onClick={onSetupUlang}>⚙️ Setup Ulang</button>
+          {auth?.role_admin==="admin_utama" && (
+            <button style={S.ghost} onClick={onSetupUlang}>⚙️ Setup Ulang</button>
+          )}
           <button style={S.ghost} onClick={onBaru}>+ Asesmen Baru</button>
           <button style={{...S.cta,padding:"9px 16px",fontSize:14}} onClick={onExport} disabled={daftar.length===0}>📥 Excel</button>
         </div>
@@ -1634,7 +1789,7 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
 // ══════════════════════════════════════════
 // DAFTAR SISWA
 // ══════════════════════════════════════════
-function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa}) {
+function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,isUtama}) {
   const [search,setSearch]=useState("");
   const [fCat,setFCat]=useState("all");
   const [fKelas,setFKelas]=useState("all");
@@ -1693,6 +1848,10 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa})
                       <div style={{display:"flex",gap:5}}>
                         <button style={S.detBtn} onClick={()=>onDetail(s)}>Detail</button>
                         <button style={{...S.detBtn,color:"#10B981",borderColor:"#10B98155"}} onClick={()=>doPrintSiswa(s)}>PDF</button>
+                        {isUtama && (
+                          <button style={{...S.detBtn,color:"#EF4444",borderColor:"#EF444433"}}
+                            onClick={async()=>{ if(!window.confirm("Hapus siswa ini?"))return; await deleteSiswa(s.id); setDaftar(p=>p.filter(x=>x.id!==s.id)); }}>🗑</button>
+                        )}
                       </div>
                     </td>
                   </tr>
