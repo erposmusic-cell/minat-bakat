@@ -57,7 +57,7 @@ export default function LoginPage({ onLogin }) {
     try {
       const userData = await loginPanitia(u, p);
       if (!userData) { setErr("Username atau password salah."); }
-      else { onLogin("panitia", { ...userData, role_admin: userData.role || "admin_utama" }); }
+      else { onLogin("panitia", { ...userData, role: undefined, role_admin: userData.role || "admin_utama" }); }
     } catch(e) { setErr(e.message || "Koneksi gagal."); }
     setLoading(false);
   }
