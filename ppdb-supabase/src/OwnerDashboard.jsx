@@ -309,16 +309,16 @@ export default function OwnerDashboard({ auth, onLogout }) {
           <div style={{background:"#0F172A",border:"1px solid #1E293B",borderRadius:20,padding:28,width:"100%",maxWidth:420}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
               <div>
-                <div style={{fontWeight:800,fontSize:16,color:"#E2E8F0"}}>🔑 Reset Password Panitia</div>
+                <div style={{fontWeight:800,fontSize:16,color:"#E2E8F0"}}>🔑 Reset Password Sekolah</div>
                 <div style={{fontSize:12,color:"#475569",marginTop:3}}>{resetModal.nama}</div>
               </div>
               <button style={{background:"none",border:"none",color:"#475569",fontSize:20,cursor:"pointer"}} onClick={()=>setResetModal(null)}>✕</button>
             </div>
             <div style={{marginBottom:14}}>
-              <label style={{fontSize:12,color:"#94A3B8",display:"block",marginBottom:6}}>📧 Email Panitia (untuk Forgot Password)</label>
+              <label style={{fontSize:12,color:"#94A3B8",display:"block",marginBottom:6}}>📧 Email Sekolah (untuk Forgot Password)</label>
               <input type="email" placeholder="email@sekolah.com" value={resetEmail} onChange={e=>setResetEmail(e.target.value)}
                 style={{width:"100%",background:"#1E293B",border:"1px solid #334155",borderRadius:8,padding:"9px 12px",color:"#E2E8F0",fontSize:14,boxSizing:"border-box"}}/>
-              <div style={{fontSize:11,color:"#475569",marginTop:4}}>Simpan email agar panitia bisa reset sendiri via Forgot Password.</div>
+              <div style={{fontSize:11,color:"#475569",marginTop:4}}>Simpan email agar sekolah bisa reset sendiri via Forgot Password.</div>
             </div>
             <div style={{marginBottom:18}}>
               <label style={{fontSize:12,color:"#94A3B8",display:"block",marginBottom:6}}>🔒 Password Baru</label>
@@ -565,7 +565,7 @@ export default function OwnerDashboard({ auth, onLogout }) {
                 1. Sekolah mendaftar di halaman <strong style={{ color:"#60A5FA" }}>Daftar</strong><br/>
                 2. Sekolah memilih paket & melakukan pembayaran<br/>
                 3. Owner mengkonfirmasi pembayaran → klik <strong style={{ color:"#10B981" }}>Tambah Lisensi</strong> → pilih paket<br/>
-                4. Lisensi key dikirim ke panitia sekolah<br/>
+                4. Lisensi key dikirim ke akun sekolah<br/>
                 5. Owner mengklik <strong style={{ color:"#10B981" }}>Aktifkan</strong> pada sekolah tersebut
               </div>
             </div>
