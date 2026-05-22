@@ -702,7 +702,7 @@ export default function App() {
 
   if (!auth) return (
     <LoginPage onLogin={(role, userData) => {
-      setAuth({role, ...userData});
+      setAuth({...userData, role});
       const target = role==="panitia" ? "dashboard" : "landing";
       setPhaseRaw(target);
       navigate(target);
