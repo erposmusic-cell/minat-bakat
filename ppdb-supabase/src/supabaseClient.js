@@ -67,6 +67,18 @@ export async function registerSekolah({ namaSekolah, alamat, kode, username, pas
     .insert({ username, password, nama: namaPanitia, school_id: sekolah.id });
   if (errPanitia) throw errPanitia;
 
+  // Auto-generate lisensi trial 30 hari
+  const tglMulai   = new Date().toISOString().slice(0, 10);
+  const tglExpired = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const chars      = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const seg        = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  const lisensiKey = `LIS-${seg()}-${seg()}-${seg()}`;
+  await supabase.from("lisensi").insert({
+    school_id: sekolah.id, lisensi_key: lisensiKey,
+    tgl_mulai: tglMulai, tgl_expired: tglExpired,
+    catatan: "Trial otomatis 30 hari",
+  });
+
   return sekolah;
 }
 
@@ -90,16 +102,113 @@ export async function loginPanitia(username, password) {
     throw new Error("Akun sekolah belum diaktifkan. Silakan hubungi admin.");
   }
 
+  // Cek lisensi aktif
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: lisensi } = await supabase
+    .from("lisensi")
+    .select("id, tgl_expired")
+    .eq("school_id", data.school_id)
+    .gte("tgl_expired", today)
+    .order("tgl_expired", { ascending: false })
+    .limit(1);
+
+  if (!lisensi || lisensi.length === 0) {
+    throw new Error("Lisensi sekolah tidak aktif atau sudah expired. Silakan hubungi admin.");
+  }
+
+  const sisaHari = Math.ceil(
+    (new Date(lisensi[0].tgl_expired) - new Date()) / (1000 * 60 * 60 * 24)
+  );
+
   return {
     username: data.username, nama: data.nama,
     school_id: data.school_id, namaSekolah: sekolah.nama,
     kodeSekolah: sekolah.kode,
+    lisensiExpired: lisensi[0].tgl_expired,
+    lisensiSisaHari: sisaHari,
   };
 }
 
 // ══════════════════════════════════════════
-// KELAS
+// LISENSI
 // ══════════════════════════════════════════
+
+/** Generate lisensi key format: LIS-XXXX-XXXX-XXXX */
+export function generateLisensiKey() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const seg = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  return `LIS-${seg()}-${seg()}-${seg()}`;
+}
+
+/** Ambil lisensi berdasarkan school_id */
+export async function fetchLisensiBySchool(schoolId) {
+  const { data, error } = await supabase
+    .from("lisensi")
+    .select("*")
+    .eq("school_id", schoolId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+/** Ambil semua lisensi (untuk Owner Dashboard) */
+export async function fetchAllLisensi() {
+  const { data, error } = await supabase
+    .from("lisensi")
+    .select("*, sekolah(nama, kode)")
+    .order("tgl_expired", { ascending: true });
+  if (error) throw error;
+  return data;
+}
+
+/** Buat lisensi baru untuk sekolah */
+export async function createLisensi({ schoolId, lisensiKey, tglMulai, tglExpired, catatan }) {
+  const key = lisensiKey || generateLisensiKey();
+  const { data, error } = await supabase
+    .from("lisensi")
+    .insert({
+      school_id: schoolId,
+      lisensi_key: key,
+      tgl_mulai: tglMulai || new Date().toISOString().slice(0, 10),
+      tgl_expired: tglExpired,
+      catatan: catatan || "",
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/** Update lisensi yang sudah ada */
+export async function updateLisensi(id, { tglExpired, catatan }) {
+  const { error } = await supabase
+    .from("lisensi")
+    .update({ tgl_expired: tglExpired, catatan, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/** Hapus lisensi */
+export async function deleteLisensi(id) {
+  const { error } = await supabase.from("lisensi").delete().eq("id", id);
+  if (error) throw error;
+}
+
+/** Cek apakah sekolah punya lisensi aktif (belum expired) */
+export async function cekLisensiAktif(schoolId) {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("lisensi")
+    .select("id, lisensi_key, tgl_expired")
+    .eq("school_id", schoolId)
+    .gte("tgl_expired", today)
+    .order("tgl_expired", { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  return data && data.length > 0 ? data[0] : null;
+}
+
+
 export async function fetchKelas(schoolId) {
   const { data, error } = await supabase
     .from("kelas").select("*").eq("school_id", schoolId).order("nama");
@@ -249,5 +358,20 @@ export async function fetchSekolahByKode(kode) {
     .eq("kode", kode.toUpperCase().trim())
     .maybeSingle();
   if (error) throw error;
-  return data; // null jika tidak ditemukan
+  if (!data) return null;
+
+  // Cek lisensi aktif
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: lisensi } = await supabase
+    .from("lisensi")
+    .select("id, tgl_expired")
+    .eq("school_id", data.id)
+    .gte("tgl_expired", today)
+    .limit(1);
+
+  if (!lisensi || lisensi.length === 0) {
+    throw new Error("Lisensi sekolah ini sudah tidak aktif. Silakan hubungi panitia sekolah.");
+  }
+
+  return data;
 }
