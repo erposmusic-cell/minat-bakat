@@ -217,20 +217,25 @@ export default function OwnerDashboard({ auth, onLogout }) {
   }
 
   async function handleDeleteSekolah(id, nama) {
-    if (!window.confirm('Hapus sekolah "' + nama + '"? Semua data termasuk lisensi akan terhapus.')) return;
+    if (!window.confirm(`Hapus sekolah "${nama}"?\n\nSemua data siswa, kelas, soal, dan lisensi akan ikut terhapus permanen.`)) return;
+    setLoading(true);
     try {
-      // Hapus panitia dulu (foreign key), lalu lisensi, lalu sekolah
-      const { error: e1 } = await supabase.from("panitia").delete().eq("school_id", id);
-      if (e1) throw e1;
-      const { error: e2 } = await supabase.from("lisensi").delete().eq("school_id", id);
-      if (e2) throw e2;
-      const { error: e3 } = await supabase.from("sekolah").delete().eq("id", id);
-      if (e3) throw e3;
+      // Hapus dari tabel anak ke tabel induk (urutan penting!)
+      const tables = ["siswa", "kelas", "soal", "target_penerimaan", "panitia", "lisensi"];
+      for (const table of tables) {
+        const { error } = await supabase.from(table).delete().eq("school_id", id);
+        if (error) throw error;
+      }
+      // Terakhir hapus sekolahnya
+      const { error } = await supabase.from("sekolah").delete().eq("id", id);
+      if (error) throw error;
+
       setSekolah(prev => prev.filter(s => s.id !== id));
       setLisensi(prev => prev.filter(l => l.school_id !== id));
     } catch(e) {
       alert("Gagal menghapus: " + (e.message || JSON.stringify(e)));
     }
+    setLoading(false);
   }
 
   async function handleSaveLisensi({ id, schoolId, lisensiKey, paket, maksSiswa, maksKelas, tglMulai, tglExpired, catatan }) {
