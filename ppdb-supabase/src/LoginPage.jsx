@@ -146,7 +146,7 @@ export default function LoginPage({ onLogin }) {
         {/* Tab Mode */}
         <div style={S.tabRow}>
           <button style={{...S.tabBtn,...(mode==="siswa"?S.tabAct:{})}} onClick={()=>{setMode("siswa");resetForm();}}>Siswa</button>
-          <button style={{...S.tabBtn,...(mode==="panitia"?S.tabAct:{})}} onClick={()=>{setMode("panitia");resetForm();}}>Panitia</button>
+          <button style={{...S.tabBtn,...(mode==="panitia"?S.tabAct:{})}} onClick={()=>{setMode("panitia");resetForm();}}>Sekolah</button>
           <button style={{...S.tabBtn,...(mode==="daftar"?S.tabAct:{})}} onClick={()=>{setMode("daftar");resetForm();}}>Daftar</button>
           {showOwner && (
             <button style={{...S.tabBtn,...(mode==="owner"?S.tabAct:{}), color:"#8B5CF6"}} onClick={()=>{setMode("owner");resetForm();}}>🔐 Owner</button>
@@ -166,12 +166,12 @@ export default function LoginPage({ onLogin }) {
           <div>
             {err && <div style={S.err}>{err}</div>}
             <div style={S.fg}><label style={S.lbl}>Username</label>
-              <input style={S.inp} value={u} onChange={e=>setU(e.target.value)} placeholder="Username panitia"/></div>
+              <input style={S.inp} value={u} onChange={e=>setU(e.target.value)} placeholder="Username sekolah"/></div>
             <div style={S.fg}><label style={S.lbl}>Password</label>
               <input style={S.inp} type="password" value={p} onChange={e=>setP(e.target.value)} placeholder="Password"
                 onKeyDown={e=>e.key==="Enter"&&tryLoginPanitia()}/></div>
             <button style={{...S.cta, opacity:loading?0.6:1}} onClick={tryLoginPanitia} disabled={loading}>
-              {loading?"Memverifikasi...":"Login Panitia →"}
+              {loading?"Memverifikasi...":"Login Sekolah →"}
             </button>
             <hr style={S.divider}/>
 
@@ -189,7 +189,7 @@ export default function LoginPage({ onLogin }) {
             )}
             {forgotMode === "email" && (
               <div style={{background:"#0B1120",border:"1px solid #1E3A5F",borderRadius:12,padding:16,marginTop:4}}>
-                <div style={{fontWeight:700,fontSize:13,color:"#60A5FA",marginBottom:10}}>🔑 Lupa Password</div>
+                <div style={{fontWeight:700,fontSize:13,color:"#60A5FA",marginBottom:10}}>🔑 Lupa Password Sekolah</div>
                 {fpMsg && <div style={{background:fpMsg.startsWith("✅")?"#052e16":"#2d0a0a",border:"1px solid "+(fpMsg.startsWith("✅")?"#16a34a":"#ef4444"),borderRadius:8,padding:"7px 11px",fontSize:12,marginBottom:10,color:fpMsg.startsWith("✅")?"#4ade80":"#f87171"}}>{fpMsg}</div>}
                 <label style={{...S.lbl}}>Email terdaftar</label>
                 <input style={{...S.inp,marginBottom:10}} type="email" placeholder="email@sekolah.com" value={fpEmail} onChange={e=>setFpEmail(e.target.value)}/>
@@ -199,7 +199,7 @@ export default function LoginPage({ onLogin }) {
                     {fpLoading?"Mengirim...":"Kirim Token Reset →"}
                   </button>
                 </div>
-                <div style={{fontSize:11,color:"#475569",marginTop:8,textAlign:"center"}}>Atau minta Owner sekolah untuk reset password manual.</div>
+                <div style={{fontSize:11,color:"#475569",marginTop:8,textAlign:"center"}}>Atau minta Owner untuk reset password manual.</div>
               </div>
             )}
             {forgotMode === "token" && (
@@ -291,7 +291,7 @@ export default function LoginPage({ onLogin }) {
                   <input style={S.inp} value={reg.namaPanitia} onChange={e=>setReg({...reg,namaPanitia:e.target.value})} placeholder="Nama lengkap"/></div>
               </div>
               <hr style={S.divider}/>
-              <p style={{ color:"#94A3B8", fontSize:11, marginBottom:12 }}>Akun untuk login ke dashboard panitia:</p>
+              <p style={{ color:"#94A3B8", fontSize:11, marginBottom:12 }}>Akun untuk login ke dashboard sekolah:</p>
               <div style={S.fg}><label style={S.lbl}>Username *</label>
                 <input style={S.inp} value={reg.username} onChange={e=>setReg({...reg,username:e.target.value})} placeholder="Buat username unik"/></div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:11 }}>
@@ -304,7 +304,7 @@ export default function LoginPage({ onLogin }) {
                 {loading?"Mendaftar...":"Daftar Sekolah →"}
               </button>
             </>}
-            <button style={S.ghost} onClick={()=>{setMode("panitia");resetForm();}}>← Kembali ke Login</button>
+            <button style={S.ghost} onClick={()=>{setMode("panitia");resetForm();}}>← Kembali ke Login Sekolah</button>
           </div>
         )}
 
