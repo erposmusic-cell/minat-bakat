@@ -84,7 +84,7 @@ export async function loginPanitia(username, password) {
   if (!data) return null;
 
   const { data: sekolah } = await supabase
-    .from("sekolah").select("aktif, nama, kode").eq("id", data.school_id).maybeSingle();
+    .from("sekolah").select("aktif, nama, kode, logo").eq("id", data.school_id).maybeSingle();
 
   if (!sekolah?.aktif) {
     throw new Error("Akun sekolah belum diaktifkan. Silakan hubungi admin.");
@@ -115,6 +115,7 @@ export async function loginPanitia(username, password) {
     school_id: data.school_id, namaSekolah: sekolah.nama,
     kodeSekolah: sekolah.kode,
     role: data.role,
+    logoSekolah: sekolah.logo || null,
     lisensiExpired:  lisensi.tgl_expired,
     lisensiSisaHari: sisaHari,
     lisensiPaket:    lisensi.paket,
@@ -494,6 +495,30 @@ export async function hapusAdmin(adminId, schoolId) {
   });
   if (error) throw error;
   return data;
+}
+
+// ══════════════════════════════════════════
+// LOGO SEKOLAH
+// ══════════════════════════════════════════
+
+/** Ambil logo sekolah (base64) */
+export async function getLogoSekolah(schoolId) {
+  const { data, error } = await supabase
+    .from("sekolah")
+    .select("logo")
+    .eq("id", schoolId)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.logo || null;
+}
+
+/** Simpan logo sekolah (base64 string, atau null untuk hapus) */
+export async function uploadLogoSekolah(schoolId, base64) {
+  const { error } = await supabase
+    .from("sekolah")
+    .update({ logo: base64 })
+    .eq("id", schoolId);
+  if (error) throw error;
 }
 
 /** Cek kuota admin berdasarkan paket lisensi */
