@@ -1,6 +1,7 @@
 // src/LoginPage.jsx
 import { useState } from "react";
 import { loginPanitia, loginOwner, registerSekolah } from "./supabaseClient";
+import { PAKET_LIST } from "./paketConfig";
 
 const S = {
   root:    { minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#080E1A", padding:"16px" },
@@ -42,6 +43,7 @@ export default function LoginPage({ onLogin }) {
   const [reg, setReg] = useState({
     namaSekolah: "", alamat: "", kode: "",
     namaPanitia: "", username: "", password: "", konfirmasi: "",
+    paketId: "starter",
   });
 
   async function tryLoginPanitia() {
@@ -84,8 +86,10 @@ export default function LoginPage({ onLogin }) {
         namaPanitia: reg.namaPanitia || reg.namaSekolah,
         username: reg.username,
         password: reg.password,
+        paketId: reg.paketId,
       });
-      setOk("✅ Pendaftaran berhasil! Akun Anda sedang menunggu persetujuan admin. Kami akan menghubungi Anda setelah diaktifkan.");
+      const paketDipilih = PAKET_LIST.find(p => p.id === reg.paketId);
+      setOk(`✅ Pendaftaran berhasil! Paket dipilih: ${paketDipilih?.nama}. Akun Anda sedang menunggu persetujuan admin setelah pembayaran dikonfirmasi.`);
       setReg({ namaSekolah:"", alamat:"", kode:"", namaPanitia:"", username:"", password:"", konfirmasi:"" });
     } catch(e) { setErr(e.message || "Pendaftaran gagal."); }
     setLoading(false);
@@ -151,6 +155,27 @@ export default function LoginPage({ onLogin }) {
             {err && <div style={S.err}>{err}</div>}
             {ok  && <div style={S.ok}>{ok}</div>}
             {!ok && <>
+              {/* Pilih Paket */}
+              <div style={S.fg}>
+                <label style={S.lbl}>Pilih Paket *</label>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:4 }}>
+                  {PAKET_LIST.map(p => (
+                    <div key={p.id} onClick={() => setReg({...reg, paketId:p.id})} style={{
+                      border:`2px solid ${reg.paketId===p.id ? p.warna : "#1E293B"}`,
+                      background: reg.paketId===p.id ? p.warna+"22" : "#0B1120",
+                      borderRadius:10, padding:"10px 12px", cursor:"pointer", position:"relative",
+                    }}>
+                      {p.popular && <div style={{ position:"absolute", top:-8, right:8, background:"#8B5CF6", color:"#fff", fontSize:9, fontWeight:800, borderRadius:20, padding:"1px 8px" }}>POPULER</div>}
+                      <div style={{ fontWeight:800, fontSize:13, color: reg.paketId===p.id ? p.warna : "#E2E8F0" }}>{p.nama}</div>
+                      <div style={{ fontSize:12, color: p.warna, fontWeight:700 }}>{p.hargaStr}</div>
+                      <div style={{ fontSize:10, color:"#475569", marginTop:2 }}>
+                        {p.maksSiswa ?? "∞"} siswa · {p.maksKelas ?? "∞"} kelas · {p.durasi ? p.durasi+"hr" : "Lifetime"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <hr style={S.divider}/>
               <div style={S.fg}><label style={S.lbl}>Nama Sekolah *</label>
                 <input style={S.inp} value={reg.namaSekolah} onChange={e=>setReg({...reg,namaSekolah:e.target.value})} placeholder="SMA Negeri 1 Kota Anda"/></div>
               <div style={S.fg}><label style={S.lbl}>Alamat Sekolah</label>
