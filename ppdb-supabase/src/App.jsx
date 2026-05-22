@@ -93,13 +93,107 @@ const CAT = [
   { id:"olahraga", label:"Olahraga & Kinestetik",  icon:"⚽", color:"#06B6D4" },
 ];
 
-const JURUSAN = {
-  logika:   ["Teknik Informatika","Matematika","Teknik Sipil","Akuntansi","Statistika","Sistem Informasi"],
-  bahasa:   ["Sastra Indonesia","Sastra Inggris","Jurnalistik","Hukum","Hub. Internasional","Pend. Bahasa"],
-  sains:    ["Kedokteran","Farmasi","Biologi","Fisika","Teknik Kimia","Kesehatan Masyarakat"],
-  seni:     ["Desain Grafis","Seni Rupa","Arsitektur","Film & TV","Musik","Animasi"],
-  sosial:   ["Psikologi","Ilmu Sosial","Manajemen","Ilmu Politik","Komunikasi","Sosiologi"],
-  olahraga: ["Ilmu Keolahragaan","Pend. Jasmani","Fisioterapi","Gizi & Kesehatan","Kepelatihan","Kes. Olahraga"],
+const JURUSAN = JURUSAN_PER_JENJANG["sma_x"]; // default fallback
+function getJurusan(jenjang) {
+  return JURUSAN_PER_JENJANG[jenjang] || JURUSAN_PER_JENJANG["sma_x"];
+}
+
+// ══════════════════════════════════════════
+// JENJANG
+// ══════════════════════════════════════════
+const JENJANG_LIST = [
+  { id: "smp",    label: "SMP / MTs",           icon: "🏫", subtitle: "Penjurusan kelas VII" },
+  { id: "sma_x",  label: "SMA / SMK — Kelas X", icon: "🎓", subtitle: "PPDB siswa baru" },
+  { id: "sma_xi", label: "SMA — Penjurusan XI",  icon: "📚", subtitle: "Pemilihan jurusan kelas XI" },
+];
+
+const JURUSAN_PER_JENJANG = {
+  smp: {
+    logika:   ["Olimpiade Matematika","Robotika & Coding","KIR Sains","Komputer","Jurnalistik Ilmiah","Debat"],
+    bahasa:   ["Jurnalistik","Sastra & Puisi","Debat Bahasa","Pidato","Drama","English Club"],
+    sains:    ["KIR Sains","Olimpiade IPA","Biologi Terapan","Fisika Eksperimen","Kimia Dasar","Lingkungan Hidup"],
+    seni:     ["Seni Rupa","Musik","Tari","Drama & Teater","Fotografi","Desain Kreatif"],
+    sosial:   ["OSIS","Pramuka","PMR","Paskibra","Relawan Sosial","Kepemimpinan"],
+    olahraga: ["Sepak Bola","Basket","Voli","Berenang","Bela Diri","Atletik"],
+  },
+  sma_x: {
+    logika:   ["Teknik Informatika","Matematika","Teknik Sipil","Akuntansi","Statistika","Sistem Informasi"],
+    bahasa:   ["Sastra Indonesia","Sastra Inggris","Jurnalistik","Hukum","Hub. Internasional","Pend. Bahasa"],
+    sains:    ["Kedokteran","Farmasi","Biologi","Fisika","Teknik Kimia","Kesehatan Masyarakat"],
+    seni:     ["Desain Grafis","Seni Rupa","Arsitektur","Film & TV","Musik","Animasi"],
+    sosial:   ["Psikologi","Ilmu Sosial","Manajemen","Ilmu Politik","Komunikasi","Sosiologi"],
+    olahraga: ["Ilmu Keolahragaan","Pend. Jasmani","Fisioterapi","Gizi & Kesehatan","Kepelatihan","Kes. Olahraga"],
+  },
+  sma_xi: {
+    logika:   ["IPA — Matematika & Sains","IPA — Teknik & Rekayasa","IPA — Kedokteran & Kesehatan","IPS — Ekonomi & Akuntansi","Bahasa — Linguistik","Vokasi — TI & Komputer"],
+    bahasa:   ["Bahasa & Sastra","IPS — Komunikasi","IPS — Hukum & Politik","IPA — Sains Komunikasi","Vokasi — Perhotelan","IPS — Sosiologi"],
+    sains:    ["IPA — Kedokteran","IPA — Farmasi & Biologi","IPA — Fisika & Teknik","IPA — Kimia Terapan","IPA — Lingkungan","Vokasi — Kesehatan"],
+    seni:     ["Bahasa — Seni & Budaya","IPA — Arsitektur","Vokasi — Desain","Vokasi — Multimedia","Bahasa — Sastra","IPS — Komunikasi Visual"],
+    sosial:   ["IPS — Manajemen","IPS — Psikologi Sosial","IPS — Ilmu Politik","IPS — Sosiologi","IPS — Hukum","Vokasi — Administrasi"],
+    olahraga: ["IPA — Kedokteran Olahraga","Vokasi — Kepelatihan","IPA — Fisioterapi","IPS — Manajemen Olahraga","Vokasi — Pend. Jasmani","IPA — Gizi & Kesehatan"],
+  },
+};
+
+// ══════════════════════════════════════════
+// GAYA BELAJAR
+// ══════════════════════════════════════════
+const GAYA_BELAJAR_CAT = [
+  { id: "visual",     label: "Visual",      icon: "👁️",  color: "#3B82F6", desc: "Belajar lewat gambar, grafik, warna & diagram" },
+  { id: "auditori",   label: "Auditori",    icon: "👂",  color: "#10B981", desc: "Belajar lewat mendengar, diskusi & ceramah" },
+  { id: "kinestetik", label: "Kinestetik",  icon: "🤲",  color: "#F59E0B", desc: "Belajar lewat praktik langsung & gerakan" },
+  { id: "baca_tulis", label: "Baca-Tulis",  icon: "📖",  color: "#8B5CF6", desc: "Belajar lewat membaca & menulis catatan" },
+];
+
+const GAYA_BELAJAR_QUESTIONS = [
+  // Visual
+  { id:"gb1", cat:"visual",     text:"Saya lebih mudah memahami materi jika ada diagram, grafik, atau gambar pendukung." },
+  { id:"gb2", cat:"visual",     text:"Saat belajar, saya sering membuat mind map atau coretan visual untuk membantu memahami." },
+  { id:"gb3", cat:"visual",     text:"Saya mengingat wajah orang lebih mudah dibanding namanya." },
+  { id:"gb4", cat:"visual",     text:"Saya lebih suka membaca buku bergambar atau infografis dibanding teks panjang." },
+  { id:"gb5", cat:"visual",     text:"Ketika menjelaskan sesuatu, saya cenderung menggambar atau menunjuk sesuatu secara visual." },
+  // Auditori
+  { id:"gb6",  cat:"auditori",  text:"Saya lebih mudah mengingat informasi yang saya dengar dibanding yang saya baca." },
+  { id:"gb7",  cat:"auditori",  text:"Belajar sambil mendengarkan musik atau suara tertentu membuat saya lebih fokus." },
+  { id:"gb8",  cat:"auditori",  text:"Saya suka berdiskusi atau menjelaskan materi kepada orang lain untuk memahaminya." },
+  { id:"gb9",  cat:"auditori",  text:"Saya mudah terganggu oleh kebisingan saat belajar." },
+  { id:"gb10", cat:"auditori",  text:"Saya sering mengulang-ulang informasi dalam hati atau dengan suara keras untuk mengingat." },
+  // Kinestetik
+  { id:"gb11", cat:"kinestetik", text:"Saya lebih mudah memahami sesuatu jika langsung mempraktikkannya." },
+  { id:"gb12", cat:"kinestetik", text:"Saya sulit duduk diam terlalu lama saat belajar dan butuh bergerak." },
+  { id:"gb13", cat:"kinestetik", text:"Saya lebih suka eksperimen atau proyek nyata dibanding membaca teori." },
+  { id:"gb14", cat:"kinestetik", text:"Belajar sambil berjalan-jalan atau bergerak membuat saya lebih mudah mengingat." },
+  { id:"gb15", cat:"kinestetik", text:"Saya menggunakan gerakan tangan atau ekspresi tubuh saat menjelaskan sesuatu." },
+  // Baca-Tulis
+  { id:"gb16", cat:"baca_tulis", text:"Saya lebih suka membaca buku teks lengkap dibanding mendengarkan penjelasan lisan." },
+  { id:"gb17", cat:"baca_tulis", text:"Membuat catatan detail saat belajar sangat membantu saya memahami materi." },
+  { id:"gb18", cat:"baca_tulis", text:"Saya sering menulis ulang catatan untuk membantu mengingat pelajaran." },
+  { id:"gb19", cat:"baca_tulis", text:"Saya lebih nyaman belajar dari buku atau artikel dibanding video atau praktik." },
+  { id:"gb20", cat:"baca_tulis", text:"Saya suka membuat daftar, rangkuman, atau poin-poin penting saat belajar." },
+];
+
+function calcGayaBelajar(answers) {
+  const scores = {};
+  GAYA_BELAJAR_CAT.forEach(c => { scores[c.id] = 0; });
+  GAYA_BELAJAR_QUESTIONS.forEach(q => {
+    if (answers[q.id]) scores[q.cat] += answers[q.id];
+  });
+  // Normalisasi ke 0-100 (5 soal x max 5 = 25)
+  GAYA_BELAJAR_CAT.forEach(c => {
+    scores[c.id] = Math.round((scores[c.id] / 25) * 100);
+  });
+  return scores;
+}
+
+function getTopGayaBelajar(scores) {
+  return Object.entries(scores)
+    .sort((a, b) => b[1] - a[1])[0];
+}
+
+const GAYA_BELAJAR_TIPS = {
+  visual:     ["Gunakan mind map & warna berbeda untuk setiap topik","Buat diagram atau gambar saat mencatat","Pilih tempat belajar yang rapi dan tidak berantakan","Tonton video pembelajaran & infografis","Tandai teks penting dengan stabilo warna-warni"],
+  auditori:   ["Rekam penjelasan guru & putar ulang saat belajar","Diskusikan materi dengan teman sebagai latihan","Baca materi dengan suara keras","Buat lagu atau ritme untuk mengingat rumus","Gunakan podcast atau audio book sebagai referensi"],
+  kinestetik: ["Buat model atau alat peraga saat belajar","Ambil jeda aktif setiap 25 menit (jalan, stretching)","Ikut praktikum, percobaan, atau proyek nyata","Tulis sambil membaca untuk menyerap materi","Belajar dalam kelompok dengan role-play atau simulasi"],
+  baca_tulis: ["Buat rangkuman & catatan detail setelah belajar","Tulis ulang catatan dengan kata-kata sendiri","Baca berbagai sumber referensi tambahan","Buat daftar poin penting sebelum ujian","Manfaatkan perpustakaan & buku teks sebagai sumber utama"],
 };
 
 const QUESTIONS = [
@@ -323,7 +417,7 @@ function generateNarasi(nama, scores, top) {
   const kombiKey = [t0.id, t1.id].sort().join("-");
   const p2base = NARASI_DB.p2_kombinasi[kombiKey] || `${nama} memiliki kombinasi bakat yang unik antara ${t0.label} dan ${t1.label}.`;
   const p2 = `${p2base} Distribusi skor: ${t0.label} (${t0.pct}%), ${t1.label} (${t1.pct}%), ${t2.label} (${t2.pct}%).`;
-  const j = JURUSAN[t0.id] || [];
+  const j = (getJurusan("sma_x")[t0.id]) || [];
   const p3fn = NARASI_DB.p3[t0.id];
   const p3 = p3fn ? p3fn(nama, j[0]||"-", j[1]||"-", j[2]||"-", t0.pct) : `${nama} disarankan untuk mendalami bidang-bidang yang selaras dengan kekuatan utamanya.`;
   return `${p1}\n\n${p2}\n\n${p3}`;
@@ -332,16 +426,21 @@ function generateNarasi(nama, scores, top) {
 function doExcelExport(daftar, kelas) {
   const rows = daftar.map((s,i)=>{
     const k=kelas.find(x=>x.id===s.kelasId);
+    const jur = s.jurusan || JURUSAN_PER_JENJANG["sma_x"];
+    const jenjangLabel = JENJANG_LIST.find(j=>j.id===s.jenjang)?.label || "-";
     return {
       "No":i+1,"Nama":s.nama,"NISN":s.nisn,"Sekolah":s.sekolah,
+      "Jenjang":jenjangLabel,
       "Tgl Lahir":s.tgl||"-","Tgl Asesmen":s.tanggalAsesmen,
       "Bakat Utama":s.top[0]?.label||"-","Skor (%)":s.top[0]?.pct||0,
       "Kelas":k?.nama||"-",
       "Logika":s.scores.logika,"Bahasa":s.scores.bahasa,"Sains":s.scores.sains,
       "Seni":s.scores.seni,"Sosial":s.scores.sosial,"Olahraga":s.scores.olahraga,
-      "Rekomendasi 1":JURUSAN[s.top[0]?.id]?.[0]||"-",
-      "Rekomendasi 2":JURUSAN[s.top[0]?.id]?.[1]||"-",
-      "Rekomendasi 3":JURUSAN[s.top[0]?.id]?.[2]||"-",
+      "Gaya Belajar":s.gayaBelajar?.label||"-",
+      "Skor Gaya (%)":s.gayaBelajar?.pct||"-",
+      "Rekomendasi 1":jur[s.top[0]?.id]?.[0]||"-",
+      "Rekomendasi 2":jur[s.top[0]?.id]?.[1]||"-",
+      "Rekomendasi 3":jur[s.top[0]?.id]?.[2]||"-",
     };
   });
   const kelasRows = kelas.map(k=>{
@@ -370,6 +469,20 @@ function doPrintSiswa(siswa) {
     </div>`).join("");
   const narasiText = siswa.narasi || "Analisis belum tersedia.";
   const narasiHtml = narasiText.split("\n\n").map(p=>`<p style="margin:0 0 14px;line-height:1.85;font-size:13.5px">${p}</p>`).join("");
+  const gb = siswa.gayaBelajar;
+  const gbHtml = gb ? `
+    <h2 style="border-left:4px solid ${gb.color};padding-left:10px;margin:20px 0 10px;font-size:15px">
+      ${gb.icon} Gaya Belajar Dominan — ${gb.label} (${gb.pct}%)
+    </h2>
+    <div style="background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="font-size:13px;color:#64748b;margin-bottom:8px">${GAYA_BELAJAR_CAT.find(c=>c.id===gb.dominan)?.desc||""}</div>
+      <strong style="font-size:13px">Tips Belajar:</strong>
+      <ol style="margin:8px 0 0;padding-left:18px">
+        ${(gb.tips||[]).map(t=>`<li style="font-size:13px;margin-bottom:4px;line-height:1.6">${t}</li>`).join("")}
+      </ol>
+    </div>` : "";
+  const jenjangInfo = JENJANG_LIST.find(j=>j.id===siswa.jenjang);
+  const jurusan = (siswa.jurusan || JURUSAN_PER_JENJANG["sma_x"])[t0.id] || [];
   const topCards = siswa.top.map((t,i)=>`
     <div style="border-radius:12px;padding:16px;text-align:center;border:2px solid ${t.color};background:${t.color}15">
       <div style="font-size:11px;color:#94a3b8;font-weight:800">#${i+1}</div>
@@ -389,7 +502,8 @@ function doPrintSiswa(siswa) {
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0">${topCards}</div>
   <h2>📈 Profil Lengkap</h2>${bars}
   <h2>🎓 Rekomendasi Jurusan</h2>
-  <ul>${(JURUSAN[t0.id]||[]).map(j=>`<li>${j}</li>`).join("")}</ul>
+  <ul>${jurusan.map(j=>`<li>${j}</li>`).join("")}</ul>
+  ${gbHtml}
   <h2>📝 Analisis Psikologi Pendidikan</h2>
   <div class="narasi">${narasiHtml}</div>
   <div class="footer">Sistem PPDB SMA · ${siswa.tanggalAsesmen}</div>
@@ -420,17 +534,21 @@ export default function App() {
   const [tab,   setTabRaw]        = useState(() => initFromUrl().tab);
   const [formSiswa, setFormSiswa] = useState({nama:"",nisn:"",sekolah:"",tgl:""});
   const [answers, setAnswers]     = useState({});
+  const [gbAnswers, setGbAnswers] = useState({}); // jawaban gaya belajar
+  const [asesPhase, setAsesPhase] = useState("bakat"); // "bakat" | "gaya_belajar"
   const [current, setCurrent]     = useState(0);
   const [animIn, setAnimIn]       = useState(true);
   const [daftar, setDaftar]       = useState([]);
   const [viewSiswa, setViewSiswa] = useState(null);
   const [kelas, setKelas]         = useState(DEFAULT_KELAS);
   const [target, setTarget]       = useState(DEFAULT_TARGET);
+  const [jenjang, setJenjang]     = useState("sma_x"); // jenjang sekolah
   const [setupDone, setSetupDone] = useState(false);
   const [dbLoading, setDbLoading] = useState(false);
   const [dbError, setDbError]     = useState(null);
   const [questions, setQuestions] = useState([]);
   const [shuffled, setShuffled]   = useState([]);
+  const [gbShuffled, setGbShuffled] = useState([]);
   const [siswaSchool, setSiswaSchool] = useState(null);
 
   // Wrapper setPhase & setTab yang sekaligus update URL
@@ -506,16 +624,29 @@ export default function App() {
     const kelasId   = autoAssign(top[0], daftar, kelas);
     const kelasNama = kelas.find(k => k.id === kelasId)?.nama || null;
     const narasi    = generateNarasi(formSiswa.nama, scores, top);
+    const gbScores  = calcGayaBelajar(gbAnswers);
+    const [topGbId, topGbPct] = getTopGayaBelajar(gbScores);
+    const topGbCat  = GAYA_BELAJAR_CAT.find(c => c.id === topGbId);
+    const jurusan   = getJurusan(jenjang);
     const rec = {
       ...formSiswa, scores, top, kelasId, kelasNama,
       tanggalAsesmen: new Date().toLocaleDateString("id-ID", { dateStyle: "long" }),
       narasi,
+      jenjang,
+      gayaBelajar: {
+        scores: gbScores,
+        dominan: topGbId,
+        pct: topGbPct,
+        label: topGbCat?.label,
+        icon: topGbCat?.icon,
+        color: topGbCat?.color,
+        tips: GAYA_BELAJAR_TIPS[topGbId] || [],
+      },
+      jurusan,
     };
     setViewSiswa(rec);
     setPhase("result");
     try {
-      // Panitia input → pakai school_id panitia
-      // Siswa mandiri → pakai school_id dari kode sekolah yang diinput
       const sid = auth?.school_id || siswaSchool?.id || null;
       await insertSiswa(rec, sid);
       if (auth?.role === "panitia") await loadAllData();
@@ -559,7 +690,8 @@ export default function App() {
   }
 
   function resetAsesmen() {
-    setAnswers({}); setCurrent(0);
+    setAnswers({}); setGbAnswers({}); setCurrent(0);
+    setAsesPhase("bakat");
     setFormSiswa({nama:"",nisn:"",sekolah:"",tgl:""});
     setSiswaSchool(null);
     setPhaseRaw("landing");
@@ -610,7 +742,7 @@ export default function App() {
       <div style={S.root}>
         <Topbar auth={auth} phase={phase} setPhase={setPhase} setAuth={setAuth} daftar={daftar} tab={tab} setTab={setTab} questions={questions}/>
         <main style={S.main} className="main-resp">
-          <SetupWizard kelas={kelas} target={target} onSaveKelas={handleSaveKelas} onSaveTarget={handleSaveTarget} onDone={()=>setSetupDone(true)} dbLoading={dbLoading}/>
+          <SetupWizard kelas={kelas} target={target} jenjang={jenjang} onSaveKelas={handleSaveKelas} onSaveTarget={handleSaveTarget} onSaveJenjang={setJenjang} onDone={()=>setSetupDone(true)} dbLoading={dbLoading}/>
         </main>
       </div>
     );
@@ -628,17 +760,34 @@ export default function App() {
           />
         )}
         {phase === "form" && <FormSiswa siswa={formSiswa} onChange={setFormSiswa} siswaSchool={siswaSchool} onLanjut={() => {
-          setCurrent(0); setAnswers({});
+          setCurrent(0); setAnswers({}); setGbAnswers({}); setAsesPhase("bakat");
           const q = questions.length > 0 ? questions : QUESTIONS;
           setShuffled([...q].sort(() => Math.random() - 0.5));
+          setGbShuffled([...GAYA_BELAJAR_QUESTIONS].sort(() => Math.random() - 0.5));
           setPhase("asesmen");
         }} />}
-        {phase === "asesmen" && (
+        {phase === "asesmen" && asesPhase === "bakat" && (
           <Asesmen
             questions={shuffled.length > 0 ? shuffled : QUESTIONS}
             current={current} answers={answers} animIn={animIn}
             onAnswer={handleAnswer}
             onNext={handleNext}
+            onPrev={() => setCurrent(c => Math.max(0, c - 1))}
+            onSelesai={() => { setAsesPhase("gaya_belajar"); setCurrent(0); }}
+          />
+        )}
+        {phase === "asesmen" && asesPhase === "gaya_belajar" && (
+          <AsesmenGayaBelajar
+            questions={gbShuffled.length > 0 ? gbShuffled : GAYA_BELAJAR_QUESTIONS}
+            current={current} answers={gbAnswers} animIn={animIn}
+            onAnswer={(qid, val) => {
+              setAnimIn(false);
+              setTimeout(() => { setGbAnswers(prev => ({...prev, [qid]: val})); setAnimIn(true); }, 180);
+            }}
+            onNext={() => {
+              setAnimIn(false);
+              setTimeout(() => { setCurrent(c => c + 1); setAnimIn(true); }, 180);
+            }}
             onPrev={() => setCurrent(c => Math.max(0, c - 1))}
             onSelesai={handleSelesai}
           />
@@ -729,8 +878,9 @@ function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab,questions}) {
 // ══════════════════════════════════════════
 // SETUP WIZARD
 // ══════════════════════════════════════════
-function SetupWizard({kelas,target,onSaveKelas,onSaveTarget,onDone,dbLoading}) {
-  const [step,setStep]=useState(1);
+function SetupWizard({kelas,target,jenjang,onSaveKelas,onSaveTarget,onSaveJenjang,onDone,dbLoading}) {
+  const [step,setStep]=useState(0); // step 0 = pilih jenjang
+  const [lj,setLj]=useState(jenjang||"sma_x");
   const [lt,setLt]=useState({...target});
   const [lk,setLk]=useState(kelas.map(k=>({...k})));
   const totalKap = lk.reduce((s,k)=>s+k.kapasitas,0);
@@ -739,13 +889,38 @@ function SetupWizard({kelas,target,onSaveKelas,onSaveTarget,onDone,dbLoading}) {
   function updK(i,f,v){ setLk(prev=>prev.map((k,idx)=>idx===i?{...k,[f]:f==="kapasitas"?parseInt(v)||0:v}:k)); }
   function addK(){ setLk(prev=>[...prev,{id:"k"+Date.now(),nama:"X-"+(prev.length+1),bidang:"sains",kapasitas:30,wali:""}]); }
   function delK(i){ if(lk.length>1) setLk(prev=>prev.filter((_,idx)=>idx!==i)); }
-  async function finish(){ await onSaveKelas(lk); await onSaveTarget(lt.min, lt.max); onDone(); }
+  async function finish(){ await onSaveKelas(lk); await onSaveTarget(lt.min, lt.max); await onSaveJenjang(lj); onDone(); }
+  const jenjangInfo = JENJANG_LIST.find(j=>j.id===lj);
   return (
     <div style={{maxWidth:660,margin:"0 auto",display:"flex",flexDirection:"column",gap:20}}>
       <div style={{textAlign:"center",padding:"18px 0 4px"}}>
         <div style={S.badge}>✦ Setup Awal PPDB</div>
         <h2 style={{fontSize:23,fontWeight:900,margin:"10px 0 4px",color:"#E2E8F0"}}>Konfigurasi Penerimaan Siswa Baru</h2>
       </div>
+      {step===0&&(
+        <div style={S.card}>
+          <h3 style={S.cardTitle}>🎓 Pilih Jenjang</h3>
+          <p style={{color:"#475569",fontSize:13,marginBottom:16}}>Sesuaikan sistem dengan kebutuhan sekolah kamu</p>
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
+            {JENJANG_LIST.map(j=>(
+              <div key={j.id} onClick={()=>setLj(j.id)} style={{
+                border:"2px solid "+(lj===j.id?"#3B82F6":"#1E293B"),
+                background:lj===j.id?"#1E3A5F":"#0B1120",
+                borderRadius:12,padding:"14px 18px",cursor:"pointer",
+                display:"flex",alignItems:"center",gap:14,transition:"all 0.15s"
+              }}>
+                <span style={{fontSize:28}}>{j.icon}</span>
+                <div>
+                  <div style={{fontWeight:700,color:lj===j.id?"#60A5FA":"#E2E8F0",fontSize:14}}>{j.label}</div>
+                  <div style={{fontSize:12,color:"#475569",marginTop:2}}>{j.subtitle}</div>
+                </div>
+                {lj===j.id&&<span style={{marginLeft:"auto",color:"#3B82F6",fontWeight:900}}>✓</span>}
+              </div>
+            ))}
+          </div>
+          <button style={{...S.cta,width:"100%"}} onClick={()=>setStep(1)}>Lanjut: Target Penerimaan →</button>
+        </div>
+      )}
       {step===1&&(
         <div style={S.card}>
           <h3 style={S.cardTitle}>🎯 Target Penerimaan</h3>
@@ -754,6 +929,7 @@ function SetupWizard({kelas,target,onSaveKelas,onSaveTarget,onDone,dbLoading}) {
             <div style={S.fg}><label style={S.lbl}>Maksimum</label><input style={S.inp} type="number" value={lt.max} onChange={e=>setLt({...lt,max:parseInt(e.target.value)||0})}/></div>
           </div>
           <button style={{...S.cta,width:"100%"}} onClick={()=>setStep(2)} disabled={lt.min<=0||lt.max<lt.min}>Lanjut: Atur Kelas →</button>
+          <button style={{...S.ghost,width:"100%",marginTop:8}} onClick={()=>setStep(0)}>← Kembali ke Jenjang</button>
         </div>
       )}
       {step===2&&(
@@ -999,10 +1175,86 @@ function Asesmen({questions,current,answers,animIn,onAnswer,onNext,onPrev,onSele
 }
 
 // ══════════════════════════════════════════
+// ASESMEN GAYA BELAJAR
+// ══════════════════════════════════════════
+function AsesmenGayaBelajar({questions,current,answers,animIn,onAnswer,onNext,onPrev,onSelesai}) {
+  const q = questions[current];
+  const cat = GAYA_BELAJAR_CAT.find(c=>c.id===q.cat);
+  const progress = (Object.keys(answers).length/questions.length)*100;
+  const allDone  = Object.keys(answers).length===questions.length;
+  const sudahJawab = answers[q.id] !== undefined;
+  const isLast = current === questions.length - 1;
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14,maxWidth:700,margin:"0 auto"}}>
+      <div style={{background:"#0F172A",border:"1px solid #1E3A5F",borderRadius:12,padding:"10px 16px",display:"flex",alignItems:"center",gap:10}}>
+        <span style={{fontSize:20}}>🧠</span>
+        <div>
+          <div style={{fontSize:12,fontWeight:700,color:"#60A5FA"}}>Bagian 2 dari 2 — Gaya Belajar</div>
+          <div style={{fontSize:11,color:"#475569"}}>Bantu kami memahami cara kamu belajar paling efektif</div>
+        </div>
+      </div>
+      <div style={{height:6,background:"#1E293B",borderRadius:99,overflow:"hidden"}}>
+        <div style={{width:progress+"%",height:"100%",background:"linear-gradient(90deg,#10B981,#3B82F6)",borderRadius:99,transition:"width 0.4s"}}/>
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}>
+        <span style={{color:"#94A3B8"}}>Soal {current+1} / {questions.length}</span>
+        <span style={{color:cat.color,fontWeight:700}}>{cat.icon} {cat.label}</span>
+        <span style={{color:"#94A3B8"}}>{Math.round(progress)}%</span>
+      </div>
+      <div style={{background:"#0F172A",border:"1px solid #1E293B",borderRadius:18,padding:28,
+        opacity:animIn?1:0,transform:animIn?"translateY(0)":"translateY(8px)",transition:"all 0.18s"}}>
+        <div style={{display:"inline-block",background:cat.color+"22",color:cat.color,borderRadius:20,padding:"3px 14px",fontSize:12,fontWeight:700,marginBottom:14}}>
+          {cat.icon} {cat.label}
+        </div>
+        <p style={{fontSize:18,fontWeight:700,lineHeight:1.55,color:"#E2E8F0",marginBottom:24}}>{q.text}</p>
+        <div style={{display:"flex",gap:7}}>
+          {SCALE.map(sc=>(
+            <button key={sc.val} onClick={()=>onAnswer(q.id,sc.val)} style={{
+              flex:1,border:"1px solid",borderRadius:12,padding:"9px 3px",cursor:"pointer",transition:"all 0.15s",
+              display:"flex",flexDirection:"column",alignItems:"center",gap:3,
+              background:answers[q.id]===sc.val?cat.color:"#1E293B",
+              borderColor:answers[q.id]===sc.val?cat.color:"#334155",
+              color:answers[q.id]===sc.val?"#fff":"#94A3B8",
+              transform:answers[q.id]===sc.val?"scale(1.06)":"scale(1)",
+            }}>
+              <span style={{fontSize:17,fontWeight:900}}>{sc.val}</span>
+              <span style={{fontSize:9,textAlign:"center",lineHeight:1.3}}>{sc.label}</span>
+            </button>
+          ))}
+        </div>
+        {sudahJawab && !isLast && (
+          <button style={{...S.cta,width:"100%",marginTop:16,fontSize:15,background:"linear-gradient(135deg,#10B981,#3B82F6)"}} onClick={onNext}>
+            Lanjut →
+          </button>
+        )}
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <button style={S.ghost} onClick={onPrev} disabled={current===0}>← Sebelumnya</button>
+        <span style={{fontSize:11,color:"#475569"}}>
+          {sudahJawab ? "Kamu bisa mengubah jawaban sebelum lanjut" : "Pilih salah satu jawaban"}
+        </span>
+        {allDone&&<button style={{...S.cta,padding:"9px 20px",fontSize:14,background:"linear-gradient(135deg,#10B981,#3B82F6)"}} onClick={onSelesai}>Lihat Hasil ✦</button>}
+      </div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:3,justifyContent:"center"}}>
+        {questions.map((qs,i)=>{
+          const qc=GAYA_BELAJAR_CAT.find(c=>c.id===qs.cat);
+          return <div key={qs.id} style={{width:8,height:8,borderRadius:2,transition:"all 0.15s",
+            background:answers[qs.id]?qc.color:i===current?"#F59E0B":"#1E293B",
+            border:i===current?"2px solid #F59E0B":"2px solid transparent"}}/>;
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
 // HASIL
 // ══════════════════════════════════════════
 function Hasil({siswa,onBaru,onDaftar,auth}) {
   const top = siswa.top; const t0 = top[0];
+  const gb  = siswa.gayaBelajar;
+  const jurusan = siswa.jurusan || JURUSAN_PER_JENJANG["sma_x"];
+  const jenjangInfo = JENJANG_LIST.find(j => j.id === siswa.jenjang);
   return (
     <div style={{display:"flex",flexDirection:"column",gap:18,maxWidth:860,margin:"0 auto"}}>
       <div style={{textAlign:"center",padding:"16px 0"}}>
@@ -1035,7 +1287,7 @@ function Hasil({siswa,onBaru,onDaftar,auth}) {
             </div>
             <div style={{width:"100%",marginTop:5}}>
               <div style={{fontSize:10,color:"#94A3B8",marginBottom:4}}>Rekomendasi:</div>
-              {JURUSAN[t.id].slice(0,3).map(j=>(
+              {(jurusan[t.id]||[]).slice(0,3).map(j=>(
                 <div key={j} style={{border:"1px solid "+t.color+"66",color:t.color,borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:600,marginBottom:3}}>{j}</div>
               ))}
             </div>
@@ -1067,13 +1319,39 @@ function Hasil({siswa,onBaru,onDaftar,auth}) {
         </div>
       </div>
       <div style={{background:t0.color+"0D",border:"1px solid "+t0.color+"33",borderRadius:16,padding:20}}>
-        <h3 style={{...S.cardTitle,color:t0.color}}>{t0.icon} Semua Rekomendasi — {t0.label}</h3>
-        <div style={{display:"flex",flexWrap:"wrap",gap:7,marginTop:10}}>
-          {JURUSAN[t0.id].map(j=>(
+        <h3 style={{...S.cardTitle,color:t0.color}}>{t0.icon} Rekomendasi — {t0.label}</h3>
+        {jenjangInfo&&<div style={{fontSize:12,color:"#475569",marginBottom:10}}>🎓 {jenjangInfo.label} · {jenjangInfo.subtitle}</div>}
+        <div style={{display:"flex",flexWrap:"wrap",gap:7,marginTop:6}}>
+          {(jurusan[t0.id]||[]).map(j=>(
             <div key={j} style={{border:"1px solid "+t0.color+"55",background:t0.color+"22",color:t0.color,borderRadius:20,padding:"5px 14px",fontSize:13,fontWeight:600}}>✓ {j}</div>
           ))}
         </div>
       </div>
+      {gb&&(
+        <div style={{background:"#0F172A",border:"2px solid "+gb.color+"55",borderRadius:16,padding:20}}>
+          <h3 style={{...S.cardTitle,color:gb.color}}>{gb.icon} Gaya Belajar Dominan — {gb.label}</h3>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12,marginBottom:16}}>
+            {GAYA_BELAJAR_CAT.map(c=>(
+              <div key={c.id} style={{flex:1,minWidth:100,background:"#0B1120",border:"1px solid "+c.color+(gb.dominan===c.id?"":"22"),borderRadius:12,padding:"10px 12px",textAlign:"center"}}>
+                <div style={{fontSize:20}}>{c.icon}</div>
+                <div style={{fontSize:12,fontWeight:700,color:gb.dominan===c.id?c.color:"#475569",marginTop:4}}>{c.label}</div>
+                <div style={{fontSize:16,fontWeight:900,color:gb.dominan===c.id?c.color:"#334155",marginTop:2}}>{gb.scores[c.id]}%</div>
+              </div>
+            ))}
+          </div>
+          <div style={{background:"#0B1120",borderRadius:12,padding:14}}>
+            <div style={{fontSize:13,fontWeight:700,color:gb.color,marginBottom:10}}>💡 Tips Belajar untuk Gaya {gb.label}:</div>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {(gb.tips||[]).map((tip,i)=>(
+                <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+                  <span style={{color:gb.color,fontWeight:900,flexShrink:0}}>{i+1}.</span>
+                  <span style={{fontSize:13,color:"#CBD5E1",lineHeight:1.6}}>{tip}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap",paddingBottom:8}}>
         {auth.role==="panitia"&&<button style={S.ghost} onClick={onDaftar}>← Data Siswa</button>}
         <button style={S.ghost} onClick={()=>doPrintSiswa(siswa)}>🖨 Cetak / PDF</button>
