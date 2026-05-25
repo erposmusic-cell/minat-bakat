@@ -85,10 +85,10 @@ import OwnerDashboard from "./OwnerDashboard";
 // ══════════════════════════════════════════
 const DEFAULT_TARGET = { min: 120, max: 175 };
 const DEFAULT_KELAS = [
-  { id:"k1", nama:"X-A", bidang:"sains",    kapasitas:35, wali:"" },
-  { id:"k2", nama:"X-B", bidang:"sosial",   kapasitas:35, wali:"" },
-  { id:"k3", nama:"X-C", bidang:"logika",   kapasitas:32, wali:"" },
-  { id:"k4", nama:"X-D", bidang:"bahasa",   kapasitas:30, wali:"" },
+  { id:"k1", nama:"X-A", bidang:"sains",    kapasitas:35, wali:"", jenjang:"sma_x" },
+  { id:"k2", nama:"X-B", bidang:"sosial",   kapasitas:35, wali:"", jenjang:"sma_x" },
+  { id:"k3", nama:"X-C", bidang:"logika",   kapasitas:32, wali:"", jenjang:"sma_x" },
+  { id:"k4", nama:"X-D", bidang:"bahasa",   kapasitas:30, wali:"", jenjang:"sma_x" },
 ];
 
 const CAT = [
@@ -323,13 +323,19 @@ function hitungKesesuaianMapel(topBakat, mapelKelas) {
   return Math.min(100, Math.round((totalSkor / maxMungkin) * 100));
 }
 
-// autoAssign: gabungkan bidang bakat + kesesuaian mapel
-function autoAssign(top, daftar, kelas) {
+// autoAssign: gabungkan bidang bakat + kesesuaian mapel, filter per jenjang
+function autoAssign(top, daftar, kelas, jenjangSiswa) {
   const top0 = Array.isArray(top) ? top[0] : top;
   const bid = top0?.id;
   const topArr = Array.isArray(top) ? top : [top0];
 
-  const withScore = kelas
+  // Filter kelas sesuai jenjang siswa (jika jenjang tidak cocok, tetap tampilkan semua)
+  const kelasFiltred = jenjangSiswa
+    ? kelas.filter(k => !k.jenjang || k.jenjang === jenjangSiswa)
+    : kelas;
+  const kelasCandidates = kelasFiltred.length > 0 ? kelasFiltred : kelas;
+
+  const withScore = kelasCandidates
     .map(k => {
       const terisi = daftar.filter(s => s.kelasId === k.id).length;
       const mapelSkor = hitungKesesuaianMapel(topArr, k.mapel || []);
@@ -697,7 +703,7 @@ export default function App() {
   async function handleSelesai() {
     const scores    = calcScores(answers);
     const top       = getTop(scores);
-    const kelasId   = autoAssign(top, daftar, kelas);
+    const kelasId   = autoAssign(top, daftar, kelas, formSiswa.jenjang || jenjang);
     const kelasNama = kelas.find(k => k.id === kelasId)?.nama || null;
     const narasi    = generateNarasi(formSiswa.nama, scores, top);
     const gbScores  = calcGayaBelajar(gbAnswers);
@@ -970,12 +976,12 @@ function SetupWizard({kelas,target,jenjang,onSaveKelas,onSaveTarget,onSaveJenjan
   const [step,setStep]=useState(0); // step 0 = pilih jenjang
   const [lj,setLj]=useState(jenjang||"sma_x");
   const [lt,setLt]=useState({...target});
-  const [lk,setLk]=useState(kelas.map(k=>({...k})));
+  const [lk,setLk]=useState(kelas.map(k=>({...k, jenjang: k.jenjang || "sma_x"})));
   const totalKap = lk.reduce((s,k)=>s+k.kapasitas,0);
   const stColor  = totalKap<lt.min?"#EF4444":totalKap>lt.max?"#F59E0B":"#10B981";
   const stMsg    = totalKap<lt.min?"⚠️ Kurang "+(lt.min-totalKap)+" kursi":totalKap>lt.max?"⚠️ Kelebihan "+(totalKap-lt.max)+" kursi":"✅ Kapasitas ideal — "+totalKap+" kursi";
   function updK(i,f,v){ setLk(prev=>prev.map((k,idx)=>idx===i?{...k,[f]:f==="kapasitas"?parseInt(v)||0:v}:k)); }
-  function addK(){ setLk(prev=>[...prev,{id:"k"+Date.now(),nama:"X-"+(prev.length+1),bidang:"sains",kapasitas:30,wali:""}]); }
+  function addK(){ setLk(prev=>[...prev,{id:"k"+Date.now(),nama:"",bidang:"sains",kapasitas:30,wali:"",jenjang:lj}]); }
   function delK(i){ if(lk.length>1) setLk(prev=>prev.filter((_,idx)=>idx!==i)); }
   async function finish(){ await onSaveKelas(lk); await onSaveTarget(lt.min, lt.max); await onSaveJenjang(lj); onDone(); }
   const jenjangInfo = JENJANG_LIST.find(j=>j.id===lj);
@@ -1034,21 +1040,42 @@ function SetupWizard({kelas,target,jenjang,onSaveKelas,onSaveTarget,onSaveJenjan
           <div style={S.card}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
               <h3 style={S.cardTitle}>🏫 Kelas ({lk.length})</h3>
-              <button style={{...S.cta,padding:"7px 14px",fontSize:13}} onClick={addK} disabled={lk.length>=8}>+ Kelas</button>
+              <button style={{...S.cta,padding:"7px 14px",fontSize:13}} onClick={addK} disabled={lk.length>=16}>+ Kelas</button>
             </div>
-            {lk.map((k,i)=>{
-              const cat=CAT.find(c=>c.id===k.bidang);
+            {/* Kelas dikelompokkan per jenjang */}
+            {JENJANG_LIST.map(j => {
+              const kelasjList = lk.filter(k=>(k.jenjang||"sma_x")===j.id);
               return (
-                <div key={k.id} style={{background:"#0B1120",border:"1px solid "+(cat?.color||"#334155")+"44",borderRadius:11,padding:12,marginBottom:8,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-                  <span style={{fontSize:20}}>{cat?.icon}</span>
-                  <div className="kelas-row-grid" style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1.5fr 80px auto",gap:8,alignItems:"center"}}>
-                    <input style={{...S.inp,padding:"6px 9px",fontSize:13}} value={k.nama} onChange={e=>updK(i,"nama",e.target.value)}/>
-                    <select style={{...S.inp,padding:"6px 9px",fontSize:13}} value={k.bidang} onChange={e=>updK(i,"bidang",e.target.value)}>
-                      {CAT.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
-                    </select>
-                    <input style={{...S.inp,padding:"6px 8px",fontSize:13}} type="number" value={k.kapasitas} min={1} max={50} onChange={e=>updK(i,"kapasitas",e.target.value)}/>
-                    <button style={{...S.ghost,padding:"5px 9px",fontSize:12,color:"#EF4444",borderColor:"#EF444433"}} onClick={()=>delK(i)} disabled={lk.length<=1}>🗑</button>
+                <div key={j.id} style={{marginBottom:16}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 12px",background:"#0B1120",borderRadius:9,marginBottom:8,border:"1px solid #1E293B"}}>
+                    <span style={{fontSize:18}}>{j.icon}</span>
+                    <span style={{fontWeight:700,color:"#94A3B8",fontSize:13}}>{j.label}</span>
+                    <span style={{fontSize:11,color:"#334155",marginLeft:"auto"}}>{kelasjList.length} kelas</span>
+                    <button
+                      style={{...S.ghost,padding:"3px 10px",fontSize:11,marginLeft:8}}
+                      onClick={()=>setLk(prev=>[...prev,{id:"k"+Date.now(),nama:"",bidang:"sains",kapasitas:30,wali:"",jenjang:j.id}])}
+                    >+ Tambah ke {j.label.split(" ")[0]}</button>
                   </div>
+                  {kelasjList.length===0 && (
+                    <div style={{fontSize:12,color:"#334155",paddingLeft:14,paddingBottom:4,fontStyle:"italic"}}>Belum ada kelas untuk jenjang ini.</div>
+                  )}
+                  {lk.map((k,i)=>{
+                    if((k.jenjang||"sma_x")!==j.id) return null;
+                    const cat=CAT.find(c=>c.id===k.bidang);
+                    return (
+                      <div key={k.id} style={{background:"#0B1120",border:"1px solid "+(cat?.color||"#334155")+"44",borderRadius:11,padding:12,marginBottom:8,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                        <span style={{fontSize:20}}>{cat?.icon}</span>
+                        <div className="kelas-row-grid" style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1.5fr 80px auto",gap:8,alignItems:"center"}}>
+                          <input style={{...S.inp,padding:"6px 9px",fontSize:13}} placeholder="Nama kelas" value={k.nama} onChange={e=>updK(i,"nama",e.target.value)}/>
+                          <select style={{...S.inp,padding:"6px 9px",fontSize:13}} value={k.bidang} onChange={e=>updK(i,"bidang",e.target.value)}>
+                            {CAT.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+                          </select>
+                          <input style={{...S.inp,padding:"6px 8px",fontSize:13}} type="number" value={k.kapasitas} min={1} max={50} onChange={e=>updK(i,"kapasitas",e.target.value)}/>
+                          <button style={{...S.ghost,padding:"5px 9px",fontSize:12,color:"#EF4444",borderColor:"#EF444433"}} onClick={()=>delK(i)} disabled={lk.length<=1}>🗑</button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
@@ -1804,6 +1831,15 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
   const totalKap=kelas.reduce((s,k)=>s+k.kapasitas,0);
   const topCat=daftar.length?CAT.find(c=>c.id===Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0])?.label||"-":"-";
 
+  // Statistik per jenjang
+  const statsPerJenjang = JENJANG_LIST.map(j => {
+    const siswaj = daftar.filter(s => (s.jenjang||"sma_x") === j.id);
+    const kelasj  = kelas.filter(k => (k.jenjang||"sma_x") === j.id);
+    const kapj    = kelasj.reduce((s,k)=>s+k.kapasitas,0);
+    const terisi  = siswaj.filter(s=>s.kelasId).length;
+    return { ...j, jumlahSiswa: siswaj.length, kapasitas: kapj, terisi, kelasCount: kelasj.length };
+  }).filter(j => j.jumlahSiswa > 0 || j.kelasCount > 0);
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:18}}>
       {auth?.kodeSekolah && (
@@ -1823,10 +1859,12 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
           <button style={{...S.cta,padding:"9px 16px",fontSize:14}} onClick={onExport} disabled={daftar.length===0}>📥 Excel</button>
         </div>
       </div>
+
+      {/* ── Progress total ── */}
       <div style={{background:"#0F172A",border:"1px solid #1E3A5F",borderRadius:14,padding:18}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:8}}>
           <div>
-            <div style={{fontSize:14,fontWeight:700,color:"#E2E8F0"}}>🎯 Progress Penerimaan</div>
+            <div style={{fontSize:14,fontWeight:700,color:"#E2E8F0"}}>🎯 Progress Penerimaan — Semua Jenjang</div>
             <div style={{fontSize:12,color:"#475569",marginTop:2}}>Target: {target.min}–{target.max} siswa · {kelas.length} kelas · {totalKap} kursi</div>
           </div>
           <div style={{textAlign:"right"}}>
@@ -1840,6 +1878,43 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
             background:daftar.length>=target.max?"#EF4444":daftar.length>=target.min?"#10B981":"#3B82F6"}}/>
         </div>
       </div>
+
+      {/* ── Progress per jenjang ── */}
+      {statsPerJenjang.length > 0 && (
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{fontSize:14,fontWeight:700,color:"#94A3B8"}}>📊 Progress Per Jenjang</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:10}}>
+            {statsPerJenjang.map(j => {
+              const pct = j.kapasitas > 0 ? Math.min(Math.round((j.jumlahSiswa/j.kapasitas)*100),100) : 0;
+              const col = pct >= 100 ? "#EF4444" : pct >= 80 ? "#F59E0B" : "#10B981";
+              return (
+                <div key={j.id} style={{background:"#0B1120",border:"1px solid #1E293B",borderRadius:12,padding:14}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:20}}>{j.icon}</span>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:700,color:"#E2E8F0"}}>{j.label}</div>
+                        <div style={{fontSize:11,color:"#475569"}}>{j.kelasCount} kelas · {j.kapasitas} kursi</div>
+                      </div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:18,fontWeight:900,color:col}}>{j.jumlahSiswa}</div>
+                      <div style={{fontSize:10,color:"#475569"}}>siswa</div>
+                    </div>
+                  </div>
+                  <div style={{height:7,background:"#1E293B",borderRadius:99,overflow:"hidden"}}>
+                    <div style={{width:pct+"%",height:"100%",background:col,borderRadius:99,transition:"width 0.6s"}}/>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#475569",marginTop:4}}>
+                    <span>Ditempatkan: {j.terisi}</span>
+                    <span style={{color:col,fontWeight:700}}>{pct}% terisi</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <div className="grid-stats4">
         {[["Total Peserta",daftar.length,"#3B82F6","👥"],
           ["Hari Ini",daftar.filter(s=>s.tanggalAsesmen===new Date().toLocaleDateString("id-ID",{dateStyle:"long"})).length,"#10B981","📅"],
@@ -2011,15 +2086,24 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
   const [editId,setEditId]=useState(null);
   const [form,setForm]=useState({});
   const [showAdd,setShowAdd]=useState(false);
-  const [newK,setNewK]=useState({nama:"",bidang:"sains",kapasitas:30,wali:"",mapel:[]});
+  const [newK,setNewK]=useState({nama:"",bidang:"sains",kapasitas:30,wali:"",mapel:[],jenjang:"sma_x"});
   const [expandMapel,setExpandMapel]=useState({});
   const totalKap=kelas.reduce((s,k)=>s+k.kapasitas,0);
   const totalTerisi=daftar.filter(s=>s.kelasId).length;
   const belum=daftar.filter(s=>!s.kelasId).length;
   const tMin=target?.min||0; const tMax=target?.max||totalKap;
+
+  // Kelompokkan kelas per jenjang
+  const kelasByJenjang = JENJANG_LIST.reduce((acc, j) => {
+    acc[j.id] = kelas.filter(k => (k.jenjang || "sma_x") === j.id);
+    return acc;
+  }, {});
+  const jenjangAktif = JENJANG_LIST.filter(j => kelasByJenjang[j.id].length > 0 || true);
+
   async function save(){ const updated=kelas.map(k=>k.id===editId?{...k,...form,kapasitas:parseInt(form.kapasitas)||30}:k); await onSaveKelas(updated); setEditId(null); }
   async function del(kid){ if(!window.confirm("Hapus kelas?"))return; await onDeleteKelas(kid); setDaftar(prev=>prev.map(s=>s.kelasId===kid?{...s,kelasId:null,kelasNama:null}:s)); }
-  async function add(){ const newKelas=[...kelas,{...newK,id:"k"+Date.now(),kapasitas:parseInt(newK.kapasitas)||30}]; await onSaveKelas(newKelas); setNewK({nama:"",bidang:"sains",kapasitas:30,wali:"",mapel:[]}); setShowAdd(false); }
+  async function add(){ const newKelas=[...kelas,{...newK,id:"k"+Date.now(),kapasitas:parseInt(newK.kapasitas)||30}]; await onSaveKelas(newKelas); setNewK({nama:"",bidang:"sains",kapasitas:30,wali:"",mapel:[],jenjang:"sma_x"}); setShowAdd(false); }
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
@@ -2039,9 +2123,28 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
         </div>
         {belum>0&&<div style={{marginTop:8,background:"#451A03",borderRadius:7,padding:"6px 10px",fontSize:12,color:"#F97316"}}>⚠️ {belum} siswa belum mendapat kelas</div>}
       </div>
+
       {showAdd&&(
         <div style={{...S.card,borderColor:"#3B82F655"}}>
           <h3 style={S.cardTitle}>Tambah Kelas Baru</h3>
+          {/* Pilih Jenjang */}
+          <div style={S.fg}>
+            <label style={S.lbl}>🎓 Jenjang</label>
+            <div style={{display:"flex",gap:7,flexWrap:"wrap",marginTop:4}}>
+              {JENJANG_LIST.map(j=>(
+                <div key={j.id} onClick={()=>setNewK({...newK,jenjang:j.id})} style={{
+                  border:"2px solid "+(newK.jenjang===j.id?"#3B82F6":"#1E293B"),
+                  background:newK.jenjang===j.id?"#1E3A5F":"#0B1120",
+                  borderRadius:10,padding:"8px 14px",cursor:"pointer",
+                  display:"flex",alignItems:"center",gap:8,transition:"all 0.15s"
+                }}>
+                  <span style={{fontSize:18}}>{j.icon}</span>
+                  <span style={{fontWeight:700,color:newK.jenjang===j.id?"#60A5FA":"#CBD5E1",fontSize:13}}>{j.label}</span>
+                  {newK.jenjang===j.id&&<span style={{color:"#3B82F6",fontWeight:900}}>✓</span>}
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="grid-soal-kelas">
             <div style={S.fg}><label style={S.lbl}>Nama Kelas</label><input style={S.inp} value={newK.nama} onChange={e=>setNewK({...newK,nama:e.target.value})} placeholder="XI-1"/></div>
             <div style={S.fg}><label style={S.lbl}>Kapasitas</label><input style={S.inp} type="number" value={newK.kapasitas} onChange={e=>setNewK({...newK,kapasitas:e.target.value})}/></div>
@@ -2052,56 +2155,99 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
           <div style={{display:"flex",gap:8,marginTop:8}}><button style={S.cta} onClick={add} disabled={!newK.nama}>Tambah</button><button style={S.ghost} onClick={()=>setShowAdd(false)}>Batal</button></div>
         </div>
       )}
-      <div className="grid-kelas-tab">
-        {kelas.map(k=>{
-          const terisi=daftar.filter(s=>s.kelasId===k.id).length;
-          const pct=Math.round((terisi/k.kapasitas)*100);
-          const cat=CAT.find(c=>c.id===k.bidang);
-          const col=pct>=100?"#EF4444":pct>=80?"#F59E0B":cat?.color||"#3B82F6";
-          const isEd=editId===k.id;
-          return (
-            <div key={k.id} style={{background:"#0F172A",border:"1px solid "+col+"44",borderRadius:14,padding:15,display:"flex",flexDirection:"column",gap:8}}>
-              {isEd?(
-                <>
-                  <input style={S.inp} value={form.nama||""} onChange={e=>setForm({...form,nama:e.target.value})}/>
-                  <select style={S.inp} value={form.bidang||"sains"} onChange={e=>setForm({...form,bidang:e.target.value})}>{CAT.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}</select>
-                  <input style={S.inp} type="number" value={form.kapasitas||30} onChange={e=>setForm({...form,kapasitas:e.target.value})}/>
-                  <input style={S.inp} value={form.wali||""} onChange={e=>setForm({...form,wali:e.target.value})} placeholder="Wali kelas"/>
-                  <MapelEditor mapel={form.mapel||[]} onChange={v=>setForm({...form,mapel:v})}/>
-                  <div style={{display:"flex",gap:6,marginTop:4}}>
-                    <button style={{...S.cta,padding:"6px 13px",fontSize:12,opacity:dbLoading?0.6:1}} onClick={save} disabled={dbLoading}>✓ Simpan</button>
-                    <button style={{...S.ghost,padding:"6px 11px",fontSize:12}} onClick={()=>setEditId(null)}>Batal</button>
-                  </div>
-                </>
-              ):(
-                <>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                    <div><div style={{fontSize:14,fontWeight:800,color:"#E2E8F0"}}>{k.nama}</div><div style={{fontSize:12,color:cat?.color,marginTop:2}}>{cat?.icon} {cat?.label}</div></div>
-                    <span style={{fontSize:11,fontWeight:800,color:col}}>{pct>=100?"PENUH 🔴":pct>=80?"HAMPIR 🟡":"TERSEDIA 🟢"}</span>
-                  </div>
-                  <div style={{height:7,background:"#1E293B",borderRadius:99,overflow:"hidden"}}><div style={{width:Math.min(pct,100)+"%",height:"100%",background:col,borderRadius:99}}/></div>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}><span style={{color:"#94A3B8"}}>{terisi}/{k.kapasitas}</span><span style={{color:col,fontWeight:700}}>{pct}%</span></div>
-                  {k.wali&&<div style={{fontSize:11,color:"#475569"}}>👤 {k.wali}</div>}
-                  {k.mapel&&k.mapel.length>0&&(
-                    <div>
-                      <div style={{fontSize:10,color:"#475569",marginBottom:4,fontWeight:700}}>📚 MAPEL PILIHAN ({k.mapel.length})</div>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                        {k.mapel.map((mp,i)=>(
-                          <span key={i} style={{background:"#1E3A5F",color:"#60A5FA",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:600}}>{mp}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <div style={{display:"flex",gap:6,marginTop:2}}>
-                    <button style={{...S.ghost,flex:1,padding:"5px",fontSize:12}} onClick={()=>{setEditId(k.id);setForm({...k});}}>✏️ Edit</button>
-                    <button style={{...S.ghost,padding:"5px 9px",fontSize:12,color:"#EF4444",borderColor:"#EF444433"}} onClick={()=>del(k.id)}>🗑</button>
-                  </div>
-                </>
-              )}
+
+      {/* ── Kelas dikelompokkan per jenjang ── */}
+      {JENJANG_LIST.map(j => {
+        const kelasList = kelasByJenjang[j.id] || [];
+        const kapJenjang = kelasList.reduce((s,k)=>s+k.kapasitas,0);
+        const terisiJenjang = daftar.filter(s=>s.kelasId && kelasList.some(k=>k.id===s.kelasId)).length;
+        const pctJenjang = kapJenjang > 0 ? Math.round((terisiJenjang/kapJenjang)*100) : 0;
+        return (
+          <div key={j.id} style={{display:"flex",flexDirection:"column",gap:10}}>
+            {/* Header jenjang */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,padding:"10px 16px",background:"#0B1120",borderRadius:12,border:"1px solid #1E293B"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:22}}>{j.icon}</span>
+                <div>
+                  <div style={{fontWeight:800,fontSize:14,color:"#E2E8F0"}}>{j.label}</div>
+                  <div style={{fontSize:11,color:"#475569"}}>{j.subtitle}</div>
+                </div>
+              </div>
+              <div style={{textAlign:"right",flexShrink:0}}>
+                <div style={{fontSize:12,color:"#60A5FA",fontWeight:700}}>{kelasList.length} kelas · {kapJenjang} kursi</div>
+                <div style={{fontSize:11,color:"#475569",marginTop:2}}>Terisi: {terisiJenjang} ({pctJenjang}%)</div>
+              </div>
             </div>
-          );
-        })}
-      </div>
+
+            {kelasList.length === 0 ? (
+              <div style={{textAlign:"center",padding:"20px",background:"#0F172A",borderRadius:12,border:"1px dashed #1E293B",color:"#334155",fontSize:13}}>
+                Belum ada kelas untuk jenjang ini. Klik "Tambah Kelas" di atas.
+              </div>
+            ) : (
+              <div className="grid-kelas-tab">
+                {kelasList.map(k=>{
+                  const terisi=daftar.filter(s=>s.kelasId===k.id).length;
+                  const pct=Math.round((terisi/k.kapasitas)*100);
+                  const cat=CAT.find(c=>c.id===k.bidang);
+                  const col=pct>=100?"#EF4444":pct>=80?"#F59E0B":cat?.color||"#3B82F6";
+                  const isEd=editId===k.id;
+                  return (
+                    <div key={k.id} style={{background:"#0F172A",border:"1px solid "+col+"44",borderRadius:14,padding:15,display:"flex",flexDirection:"column",gap:8}}>
+                      {isEd?(
+                        <>
+                          {/* Edit jenjang */}
+                          <div style={S.fg}>
+                            <label style={S.lbl}>Jenjang</label>
+                            <select style={S.inp} value={form.jenjang||"sma_x"} onChange={e=>setForm({...form,jenjang:e.target.value})}>
+                              {JENJANG_LIST.map(j=><option key={j.id} value={j.id}>{j.icon} {j.label}</option>)}
+                            </select>
+                          </div>
+                          <input style={S.inp} value={form.nama||""} onChange={e=>setForm({...form,nama:e.target.value})}/>
+                          <select style={S.inp} value={form.bidang||"sains"} onChange={e=>setForm({...form,bidang:e.target.value})}>{CAT.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}</select>
+                          <input style={S.inp} type="number" value={form.kapasitas||30} onChange={e=>setForm({...form,kapasitas:e.target.value})}/>
+                          <input style={S.inp} value={form.wali||""} onChange={e=>setForm({...form,wali:e.target.value})} placeholder="Wali kelas"/>
+                          <MapelEditor mapel={form.mapel||[]} onChange={v=>setForm({...form,mapel:v})}/>
+                          <div style={{display:"flex",gap:6,marginTop:4}}>
+                            <button style={{...S.cta,padding:"6px 13px",fontSize:12,opacity:dbLoading?0.6:1}} onClick={save} disabled={dbLoading}>✓ Simpan</button>
+                            <button style={{...S.ghost,padding:"6px 11px",fontSize:12}} onClick={()=>setEditId(null)}>Batal</button>
+                          </div>
+                        </>
+                      ):(
+                        <>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                            <div>
+                              <div style={{fontSize:14,fontWeight:800,color:"#E2E8F0"}}>{k.nama}</div>
+                              <div style={{fontSize:12,color:cat?.color,marginTop:2}}>{cat?.icon} {cat?.label}</div>
+                            </div>
+                            <span style={{fontSize:11,fontWeight:800,color:col}}>{pct>=100?"PENUH 🔴":pct>=80?"HAMPIR 🟡":"TERSEDIA 🟢"}</span>
+                          </div>
+                          <div style={{height:7,background:"#1E293B",borderRadius:99,overflow:"hidden"}}><div style={{width:Math.min(pct,100)+"%",height:"100%",background:col,borderRadius:99}}/></div>
+                          <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}><span style={{color:"#94A3B8"}}>{terisi}/{k.kapasitas}</span><span style={{color:col,fontWeight:700}}>{pct}%</span></div>
+                          {k.wali&&<div style={{fontSize:11,color:"#475569"}}>👤 {k.wali}</div>}
+                          {k.mapel&&k.mapel.length>0&&(
+                            <div>
+                              <div style={{fontSize:10,color:"#475569",marginBottom:4,fontWeight:700}}>📚 MAPEL PILIHAN ({k.mapel.length})</div>
+                              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                                {k.mapel.map((mp,i)=>(
+                                  <span key={i} style={{background:"#1E3A5F",color:"#60A5FA",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:600}}>{mp}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <div style={{display:"flex",gap:6,marginTop:2}}>
+                            <button style={{...S.ghost,flex:1,padding:"5px",fontSize:12}} onClick={()=>{setEditId(k.id);setForm({...k});}}>✏️ Edit</button>
+                            <button style={{...S.ghost,padding:"5px 9px",fontSize:12,color:"#EF4444",borderColor:"#EF444433"}} onClick={()=>del(k.id)}>🗑</button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -2158,23 +2304,32 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,i
                     <td style={S.td}><span style={{border:"1px solid "+t.color+"66",color:t.color,borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:600,display:"inline-block"}}>{t.icon} {t.label}</span></td>
                     <td style={{...S.td,color:t.color,fontWeight:700}}>{t.pct}%</td>
                     <td style={S.td}>
-                      <select style={{background:"#1E293B",border:"1px solid #334155",color:k?"#60A5FA":"#EF4444",borderRadius:8,padding:"4px 7px",fontSize:12,cursor:"pointer"}}
-                        value={s.kelasId||""} onChange={e=>{const kid=e.target.value||null;const kn=kelas.find(x=>x.id===kid)?.nama||null;onUpdateKelasSiswa(s.id,kid,kn);}}>
-                        <option value="">— Pilih —</option>
-                        {[...kelas]
-                          .map(kx=>({
-                            ...kx,
-                            terisi:daftar.filter(ss=>ss.kelasId===kx.id).length,
-                            skor:hitungKesesuaianMapel(s.top, kx.mapel||[]),
-                          }))
-                          .sort((a,b)=>(b.skor||0)-(a.skor||0))
-                          .map(kx=>{
-                            const penuh=kx.terisi>=kx.kapasitas&&s.kelasId!==kx.id;
-                            const skorLabel=kx.skor!==null?` [cocok ${kx.skor}%]`:"";
-                            return <option key={kx.id} value={kx.id} disabled={penuh}>{kx.nama} ({kx.terisi}/{kx.kapasitas}){skorLabel}{penuh?" PENUH":""}</option>;
-                          })
-                        }
-                      </select>
+                      {/* Dropdown kelas: hanya tampilkan kelas sesuai jenjang siswa */}
+                      {(() => {
+                        const jenjangSiswa = s.jenjang || "sma_x";
+                        const kelasFiltred = kelas.filter(kx => !kx.jenjang || kx.jenjang === jenjangSiswa);
+                        const kelasCandidates = kelasFiltred.length > 0 ? kelasFiltred : kelas;
+                        const k = kelas.find(x=>x.id===s.kelasId);
+                        return (
+                          <select style={{background:"#1E293B",border:"1px solid #334155",color:k?"#60A5FA":"#EF4444",borderRadius:8,padding:"4px 7px",fontSize:12,cursor:"pointer"}}
+                            value={s.kelasId||""} onChange={e=>{const kid=e.target.value||null;const kn=kelas.find(x=>x.id===kid)?.nama||null;onUpdateKelasSiswa(s.id,kid,kn);}}>
+                            <option value="">— Pilih —</option>
+                            {[...kelasCandidates]
+                              .map(kx=>({
+                                ...kx,
+                                terisi:daftar.filter(ss=>ss.kelasId===kx.id).length,
+                                skor:hitungKesesuaianMapel(s.top, kx.mapel||[]),
+                              }))
+                              .sort((a,b)=>(b.skor||0)-(a.skor||0))
+                              .map(kx=>{
+                                const penuh=kx.terisi>=kx.kapasitas&&s.kelasId!==kx.id;
+                                const skorLabel=kx.skor!==null?` [cocok ${kx.skor}%]`:"";
+                                return <option key={kx.id} value={kx.id} disabled={penuh}>{kx.nama} ({kx.terisi}/{kx.kapasitas}){skorLabel}{penuh?" PENUH":""}</option>;
+                              })
+                            }
+                          </select>
+                        );
+                      })()}
                     </td>
                     <td style={S.td}>
                       <div style={{display:"flex",gap:5}}>
