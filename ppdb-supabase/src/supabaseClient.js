@@ -302,6 +302,7 @@ export async function saveTarget(min, max, schoolId, perJenjang) {
   const pj = perJenjang || {};
   const payload = {
     min, max,
+    school_id:  schoolId,
     smp_min:    pj.smp?.min    ?? 100,
     smp_max:    pj.smp?.max    ?? 150,
     sma_x_min:  pj.sma_x?.min  ?? 120,
@@ -310,15 +311,18 @@ export async function saveTarget(min, max, schoolId, perJenjang) {
     sma_xi_max: pj.sma_xi?.max ?? 120,
     updated_at: new Date().toISOString(),
   };
-  const { data: existing } = await supabase
+  // UPDATE dulu jika row sudah ada; INSERT jika belum
+  const { data: existing, error: selErr } = await supabase
     .from("target_penerimaan").select("id").eq("school_id", schoolId).maybeSingle();
-  if (existing) {
+  if (selErr) throw selErr;
+  if (existing?.id) {
     const { error } = await supabase.from("target_penerimaan")
       .update(payload).eq("id", existing.id);
     if (error) throw error;
   } else {
+    // upsert agar tidak duplicate jika race condition
     const { error } = await supabase.from("target_penerimaan")
-      .insert({ ...payload, school_id: schoolId });
+      .upsert(payload, { onConflict: "school_id", ignoreDuplicates: false });
     if (error) throw error;
   }
 }
