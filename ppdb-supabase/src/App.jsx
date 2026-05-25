@@ -532,15 +532,22 @@ function doPrintSiswa(siswa, logoBase64, namaSekolah, tahunAjaran) {
   <div class="narasi">${narasiHtml}</div>
   <div class="footer">Sistem PPDB SMA · ${siswa.tanggalAsesmen}</div>
   </body></html>`;
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  // Sisipkan auto-print script ke dalam HTML
+  const htmlWithPrint = html.replace("</body>", `<script>window.onload=function(){window.print();}<\/script></body>`);
+  const blob = new Blob([htmlWithPrint], { type: "text/html;charset=utf-8" });
   const url  = URL.createObjectURL(blob);
-  const w    = window.open(url, "_blank");
-  if (w) { w.addEventListener("load", () => w.print()); }
-  else {
+  // Coba buka tab baru dulu
+  const w = window.open(url, "_blank");
+  if (!w || w.closed || typeof w.closed === "undefined") {
+    // Popup diblokir — fallback: download langsung
     const a = document.createElement("a");
-    a.href = url; a.download = `Laporan_${siswa.nama.replace(/\s+/g,"_")}.html`; a.click();
+    a.href = url;
+    a.download = `Laporan_${siswa.nama.replace(/\s+/g,"_")}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   }
-  setTimeout(() => URL.revokeObjectURL(url), 15000);
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
 // ══════════════════════════════════════════
