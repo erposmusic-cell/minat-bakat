@@ -278,20 +278,47 @@ export async function fetchTarget(schoolId) {
   const { data, error } = await supabase
     .from("target_penerimaan").select("*").eq("school_id", schoolId).maybeSingle();
   if (error) throw error;
-  if (!data) return { min: 120, max: 175 };
-  return { min: data.min, max: data.max };
+  const defaults = {
+    min: 120, max: 175,
+    perJenjang: {
+      smp:    { min: 100, max: 150 },
+      sma_x:  { min: 120, max: 175 },
+      sma_xi: { min: 80,  max: 120 },
+    },
+  };
+  if (!data) return defaults;
+  return {
+    min: data.min,
+    max: data.max,
+    perJenjang: {
+      smp:    { min: data.smp_min    ?? 100, max: data.smp_max    ?? 150 },
+      sma_x:  { min: data.sma_x_min  ?? 120, max: data.sma_x_max  ?? 175 },
+      sma_xi: { min: data.sma_xi_min ?? 80,  max: data.sma_xi_max ?? 120 },
+    },
+  };
 }
 
-export async function saveTarget(min, max, schoolId) {
+export async function saveTarget(min, max, schoolId, perJenjang) {
+  const pj = perJenjang || {};
+  const payload = {
+    min, max,
+    smp_min:    pj.smp?.min    ?? 100,
+    smp_max:    pj.smp?.max    ?? 150,
+    sma_x_min:  pj.sma_x?.min  ?? 120,
+    sma_x_max:  pj.sma_x?.max  ?? 175,
+    sma_xi_min: pj.sma_xi?.min ?? 80,
+    sma_xi_max: pj.sma_xi?.max ?? 120,
+    updated_at: new Date().toISOString(),
+  };
   const { data: existing } = await supabase
     .from("target_penerimaan").select("id").eq("school_id", schoolId).maybeSingle();
   if (existing) {
     const { error } = await supabase.from("target_penerimaan")
-      .update({ min, max, updated_at: new Date().toISOString() }).eq("id", existing.id);
+      .update(payload).eq("id", existing.id);
     if (error) throw error;
   } else {
     const { error } = await supabase.from("target_penerimaan")
-      .insert({ min, max, school_id: schoolId, updated_at: new Date().toISOString() });
+      .insert({ ...payload, school_id: schoolId });
     if (error) throw error;
   }
 }
