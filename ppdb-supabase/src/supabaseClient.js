@@ -247,7 +247,10 @@ export async function fetchKelas(schoolId) {
   const { data, error } = await supabase
     .from("kelas").select("*").eq("school_id", schoolId).order("nama");
   if (error) throw error;
-  return data;
+  return data.map(k => ({
+    ...k,
+    mapel: Array.isArray(k.mapel) ? k.mapel : (k.mapel ? JSON.parse(k.mapel) : []),
+  }));
 }
 
 export async function upsertKelas(kelasArr, schoolId) {
@@ -389,7 +392,7 @@ function siswaToDbRow(s) {
 export async function fetchSekolahByKode(kode) {
   const { data, error } = await supabase
     .from("sekolah")
-    .select("id, nama, kode, aktif")
+    .select("id, nama, kode, aktif, logo, tahun_ajaran")
     .eq("kode", kode.toUpperCase().trim())
     .maybeSingle();
   if (error) throw error;
