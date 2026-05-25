@@ -249,6 +249,7 @@ export async function fetchKelas(schoolId) {
   if (error) throw error;
   return data.map(k => ({
     ...k,
+    jenjang: k.jenjang || "sma_x",       // ← pastikan jenjang terbawa
     mapel: Array.isArray(k.mapel) ? k.mapel : (k.mapel ? JSON.parse(k.mapel) : []),
   }));
 }
@@ -258,6 +259,7 @@ export async function upsertKelas(kelasArr, schoolId) {
     id: k.id, nama: k.nama, bidang: k.bidang,
     kapasitas: k.kapasitas, wali: k.wali || "",
     mapel: k.mapel || [],
+    jenjang: k.jenjang || "sma_x",       // ← field jenjang
     school_id: schoolId, updated_at: new Date().toISOString(),
   }));
   const { error } = await supabase.from("kelas").upsert(rows);
@@ -364,6 +366,7 @@ function dbRowToSiswa(row) {
     id: row.id, nama: row.nama, nisn: row.nisn, sekolah: row.sekolah,
     tgl: row.tgl_lahir, tanggalAsesmen: row.tanggal_asesmen,
     kelasId: row.kelas_id, kelasNama: row.kelas_nama, narasi: row.narasi,
+    jenjang: row.jenjang || "sma_x",     // ← field jenjang
     scores: {
       logika: row.skor_logika||0, bahasa: row.skor_bahasa||0, sains: row.skor_sains||0,
       seni: row.skor_seni||0, sosial: row.skor_sosial||0, olahraga: row.skor_olahraga||0,
@@ -379,6 +382,7 @@ function siswaToDbRow(s) {
     nama: s.nama, nisn: s.nisn, sekolah: s.sekolah, tgl_lahir: s.tgl||"",
     tanggal_asesmen: s.tanggalAsesmen, kelas_id: s.kelasId||null,
     kelas_nama: s.kelasNama||null, narasi: s.narasi||"",
+    jenjang: s.jenjang || "sma_x",       // ← field jenjang
     skor_logika: s.scores.logika, skor_bahasa: s.scores.bahasa,
     skor_sains: s.scores.sains, skor_seni: s.scores.seni,
     skor_sosial: s.scores.sosial, skor_olahraga: s.scores.olahraga,
