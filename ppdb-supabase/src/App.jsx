@@ -346,19 +346,6 @@ function autoAssign(top, daftar, kelas) {
   return withScore[0]?.id || null;
 }
 
-  const bid = top0?.id;
-  const candidates = kelas
-    .map(k=>({...k, terisi:daftar.filter(s=>s.kelasId===k.id).length}))
-    .filter(k=>k.bidang===bid && k.terisi<k.kapasitas)
-    .sort((a,b)=>a.terisi-b.terisi);
-  if(candidates.length>0) return candidates[0].id;
-  const fallback = kelas
-    .map(k=>({...k, terisi:daftar.filter(s=>s.kelasId===k.id).length}))
-    .filter(k=>k.terisi<k.kapasitas)
-    .sort((a,b)=>a.terisi-b.terisi);
-  return fallback[0]?.id || null;
-}
-
 // ══════════════════════════════════════════
 // GENERATOR NARASI
 // ══════════════════════════════════════════
