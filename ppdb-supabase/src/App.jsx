@@ -1718,7 +1718,7 @@ function KodeBanner({kode, namaSekolah}) {
 // ══════════════════════════════════════════
 function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDetail,onBaru,onExport,onSetupUlang,onSaveKelas,onDeleteKelas,onUpdateKelasSiswa,onRefresh,dbLoading,logoSekolah,onSaveLogo,tahunAjaran,onSaveTahun}) {
   const isUtama = auth?.role_admin === "admin_utama";
-  if(tab==="data")  return <DaftarSiswa daftar={daftar} kelas={kelas} onDetail={onDetail} onBaru={onBaru} onExport={onExport} onUpdateKelasSiswa={onUpdateKelasSiswa} isUtama={isUtama} logoSekolah={logoSekolah} auth={auth}/>;
+  if(tab==="data")  return <DaftarSiswa daftar={daftar} kelas={kelas} onDetail={onDetail} onBaru={onBaru} onExport={onExport} onUpdateKelasSiswa={onUpdateKelasSiswa} isUtama={isUtama} logoSekolah={logoSekolah} tahunAjaran={tahunAjaran} auth={auth}/>;
   if(tab==="soal")  return (
     <ManajemenSoal
       soal={questions}
@@ -2043,7 +2043,7 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
 // ══════════════════════════════════════════
 // DAFTAR SISWA
 // ══════════════════════════════════════════
-function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,isUtama,logoSekolah,auth}) {
+function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,isUtama,logoSekolah,tahunAjaran,auth}) {
   const [search,setSearch]=useState("");
   const [fCat,setFCat]=useState("all");
   const [fKelas,setFKelas]=useState("all");
