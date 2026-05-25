@@ -254,6 +254,7 @@ export async function upsertKelas(kelasArr, schoolId) {
   const rows = kelasArr.map(k => ({
     id: k.id, nama: k.nama, bidang: k.bidang,
     kapasitas: k.kapasitas, wali: k.wali || "",
+    mapel: k.mapel || [],
     school_id: schoolId, updated_at: new Date().toISOString(),
   }));
   const { error } = await supabase.from("kelas").upsert(rows);
