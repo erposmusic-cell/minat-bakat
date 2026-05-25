@@ -293,7 +293,59 @@ function getTop(scores) {
     .map(([id,pct])=>({id,pct,...CAT.find(c=>c.id===id)}));
 }
 
-function autoAssign(top0, daftar, kelas) {
+
+// Kata kunci mapel per bidang bakat untuk pencocokan
+const MAPEL_KEYWORDS = {
+  logika:   ["matematika","informatika","komputer","fisika","kimia","statistika","akuntansi","ekonomi"],
+  bahasa:   ["bahasa","indonesia","inggris","jerman","jepang","arab","sastra","jurnalistik","komunikasi"],
+  sains:    ["fisika","biologi","kimia","ipa","sains","kesehatan","lingkungan","geografi"],
+  seni:     ["seni","musik","tari","desain","kriya","gambar","teater","budaya"],
+  sosial:   ["sosiologi","sejarah","ips","pkn","geografi","ekonomi","sosial","politik","antropologi"],
+  olahraga: ["olahraga","pjok","jasmani","kesehatan","atletik","penjas"],
+};
+
+// Hitung skor kesesuaian bakat siswa (top 3) dengan mapel kelas (0-100)
+function hitungKesesuaianMapel(topBakat, mapelKelas) {
+  if (!mapelKelas || mapelKelas.length === 0) return null; // null = tidak ada mapel
+  let totalSkor = 0;
+  topBakat.forEach((t, i) => {
+    const bobot = i === 0 ? 3 : i === 1 ? 2 : 1; // bakat #1 bobot 3, #2 bobot 2, #3 bobot 1
+    const keywords = MAPEL_KEYWORDS[t.id] || [];
+    mapelKelas.forEach(mp => {
+      const mpLow = mp.toLowerCase();
+      if (keywords.some(kw => mpLow.includes(kw))) {
+        totalSkor += bobot * 20; // tiap match +20 poin (x bobot)
+      }
+    });
+  });
+  // Normalisasi ke 0-100
+  const maxMungkin = 6 * mapelKelas.length * 20; // bobot max (3+2+1) x jumlah mapel x 20
+  return Math.min(100, Math.round((totalSkor / maxMungkin) * 100));
+}
+
+// autoAssign: gabungkan bidang bakat + kesesuaian mapel
+function autoAssign(top, daftar, kelas) {
+  const top0 = Array.isArray(top) ? top[0] : top;
+  const bid = top0?.id;
+  const topArr = Array.isArray(top) ? top : [top0];
+
+  const withScore = kelas
+    .map(k => {
+      const terisi = daftar.filter(s => s.kelasId === k.id).length;
+      const mapelSkor = hitungKesesuaianMapel(topArr, k.mapel || []);
+      // Skor gabungan: bidang cocok (+60), mapel skor (0-40), kurangi kepadatan
+      const bidangCocok = k.bidang === bid ? 60 : 0;
+      const mapelBonus  = mapelSkor !== null ? Math.round(mapelSkor * 0.4) : 0;
+      const padatPenalty = terisi / (k.kapasitas || 1) * 20;
+      const totalSkor   = bidangCocok + mapelBonus - padatPenalty;
+      return { ...k, terisi, totalSkor, mapelSkor };
+    })
+    .filter(k => k.terisi < k.kapasitas)
+    .sort((a, b) => b.totalSkor - a.totalSkor);
+
+  return withScore[0]?.id || null;
+}
+
   const bid = top0?.id;
   const candidates = kelas
     .map(k=>({...k, terisi:daftar.filter(s=>s.kelasId===k.id).length}))
@@ -658,7 +710,7 @@ export default function App() {
   async function handleSelesai() {
     const scores    = calcScores(answers);
     const top       = getTop(scores);
-    const kelasId   = autoAssign(top[0], daftar, kelas);
+    const kelasId   = autoAssign(top, daftar, kelas);
     const kelasNama = kelas.find(k => k.id === kelasId)?.nama || null;
     const narasi    = generateNarasi(formSiswa.nama, scores, top);
     const gbScores  = calcGayaBelajar(gbAnswers);
@@ -2102,7 +2154,19 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,i
                       <select style={{background:"#1E293B",border:"1px solid #334155",color:k?"#60A5FA":"#EF4444",borderRadius:8,padding:"4px 7px",fontSize:12,cursor:"pointer"}}
                         value={s.kelasId||""} onChange={e=>{const kid=e.target.value||null;const kn=kelas.find(x=>x.id===kid)?.nama||null;onUpdateKelasSiswa(s.id,kid,kn);}}>
                         <option value="">— Pilih —</option>
-                        {kelas.map(kx=>{const tr2=daftar.filter(ss=>ss.kelasId===kx.id).length;const penuh=tr2>=kx.kapasitas&&s.kelasId!==kx.id;return <option key={kx.id} value={kx.id} disabled={penuh}>{kx.nama} ({tr2}/{kx.kapasitas}){penuh?" PENUH":""}</option>;})}
+                        {[...kelas]
+                          .map(kx=>({
+                            ...kx,
+                            terisi:daftar.filter(ss=>ss.kelasId===kx.id).length,
+                            skor:hitungKesesuaianMapel(s.top, kx.mapel||[]),
+                          }))
+                          .sort((a,b)=>(b.skor||0)-(a.skor||0))
+                          .map(kx=>{
+                            const penuh=kx.terisi>=kx.kapasitas&&s.kelasId!==kx.id;
+                            const skorLabel=kx.skor!==null?` [cocok ${kx.skor}%]`:"";
+                            return <option key={kx.id} value={kx.id} disabled={penuh}>{kx.nama} ({kx.terisi}/{kx.kapasitas}){skorLabel}{penuh?" PENUH":""}</option>;
+                          })
+                        }
                       </select>
                     </td>
                     <td style={S.td}>
