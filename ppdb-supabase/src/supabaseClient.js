@@ -300,7 +300,7 @@ export async function fetchTarget(schoolId) {
 
 export async function saveTarget(min, max, schoolId, perJenjang) {
   const pj = perJenjang || {};
-  const payload = {
+  const fields = {
     min, max,
     school_id:  schoolId,
     smp_min:    pj.smp?.min    ?? 100,
@@ -311,20 +311,34 @@ export async function saveTarget(min, max, schoolId, perJenjang) {
     sma_xi_max: pj.sma_xi?.max ?? 120,
     updated_at: new Date().toISOString(),
   };
-  // UPDATE dulu jika row sudah ada; INSERT jika belum
-  const { data: existing, error: selErr } = await supabase
+
+  // Cari row berdasarkan school_id dulu
+  const { data: bySchool } = await supabase
     .from("target_penerimaan").select("id").eq("school_id", schoolId).maybeSingle();
-  if (selErr) throw selErr;
-  if (existing?.id) {
+
+  if (bySchool?.id) {
+    // Row dengan school_id ini sudah ada → UPDATE
     const { error } = await supabase.from("target_penerimaan")
-      .update(payload).eq("id", existing.id);
+      .update(fields).eq("id", bySchool.id);
     if (error) throw error;
-  } else {
-    // upsert agar tidak duplicate jika race condition
-    const { error } = await supabase.from("target_penerimaan")
-      .upsert(payload, { onConflict: "school_id", ignoreDuplicates: false });
-    if (error) throw error;
+    return;
   }
+
+  // Cari row manapun yang belum punya school_id (row seed lama id=1)
+  const { data: orphan } = await supabase
+    .from("target_penerimaan").select("id").is("school_id", null).limit(1).maybeSingle();
+
+  if (orphan?.id) {
+    // Klaim row lama dengan menyuntikkan school_id
+    const { error } = await supabase.from("target_penerimaan")
+      .update(fields).eq("id", orphan.id);
+    if (error) throw error;
+    return;
+  }
+
+  // Benar-benar belum ada row → INSERT
+  const { error } = await supabase.from("target_penerimaan").insert(fields);
+  if (error) throw error;
 }
 
 // ══════════════════════════════════════════
