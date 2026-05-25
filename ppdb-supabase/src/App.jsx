@@ -569,7 +569,7 @@ function doPrintSiswa(siswa, logoBase64, namaSekolah, tahunAjaran) {
   ${gbHtml}
   <h2>📝 Analisis Psikologi Pendidikan</h2>
   <div class="narasi">${narasiHtml}</div>
-  <div class="footer">Sistem PPDB SMA · ${siswa.tanggalAsesmen}</div>
+  <div class="footer">${namaSekolah ? namaSekolah + " · " : "Sistem PPDB SMA · "}${siswa.tanggalAsesmen}</div>
   </body></html>`;
   // Sisipkan auto-print script ke dalam HTML
   const htmlWithPrint = html.replace("</body>", `<script>window.onload=function(){window.print();}<\/script></body>`);
