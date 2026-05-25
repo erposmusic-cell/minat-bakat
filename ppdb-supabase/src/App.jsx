@@ -787,7 +787,7 @@ export default function App() {
         {phase === "landing" && <Landing onMulai={()=>setPhase(auth?.role==="panitia"?"form":"kode")} />}
         {phase === "kode" && (
           <InputKodeSekolah
-            onValid={(sekolah) => { setSiswaSchool(sekolah); setPhase("form"); }}
+            onValid={(sekolah) => { setSiswaSchool(sekolah); if (sekolah.logo) setLogoSekolah(sekolah.logo); if (sekolah.tahun_ajaran) setTahunAjaran(sekolah.tahun_ajaran); setPhase("form"); }}
             onBatal={() => setPhase("landing")}
           />
         )}
@@ -824,7 +824,7 @@ export default function App() {
             onSelesai={handleSelesai}
           />
         )}
-        {phase === "result" && viewSiswa && <Hasil siswa={viewSiswa} onBaru={resetAsesmen} onDaftar={()=>setPhase("dashboard","data")} auth={auth}/>}
+        {phase === "result" && viewSiswa && <Hasil siswa={viewSiswa} onBaru={resetAsesmen} onDaftar={()=>setPhase("dashboard","data")} auth={auth} logoSekolah={logoSekolah} tahunAjaran={tahunAjaran}/>}
         {phase === "dashboard" && auth.role==="panitia" && (
           <Dashboard
             daftar={daftar} setDaftar={setDaftar}
@@ -1570,7 +1570,7 @@ function AsesmenGayaBelajar({questions,current,answers,animIn,onAnswer,onNext,on
 // ══════════════════════════════════════════
 // HASIL
 // ══════════════════════════════════════════
-function Hasil({siswa,onBaru,onDaftar,auth}) {
+function Hasil({siswa,onBaru,onDaftar,auth,logoSekolah,tahunAjaran}) {
   const top = siswa.top; const t0 = top[0];
   const gb  = siswa.gayaBelajar;
   const jurusan = siswa.jurusan || JURUSAN_PER_JENJANG["sma_x"];
