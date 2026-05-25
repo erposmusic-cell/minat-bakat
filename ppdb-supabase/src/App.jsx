@@ -602,7 +602,7 @@ export default function App() {
   const [auth, setAuth]           = useState(null);
   const [phase, setPhaseRaw]      = useState(() => initFromUrl().phase);
   const [tab,   setTabRaw]        = useState(() => initFromUrl().tab);
-  const [formSiswa, setFormSiswa] = useState({nama:"",nisn:"",sekolah:"",tgl:""});
+  const [formSiswa, setFormSiswa] = useState({nama:"",nisn:"",sekolah:"",tgl:"",jenjang:"sma_x"});
   const [answers, setAnswers]     = useState({});
   const [gbAnswers, setGbAnswers] = useState({}); // jawaban gaya belajar
   const [asesPhase, setAsesPhase] = useState("bakat"); // "bakat" | "gaya_belajar"
@@ -708,7 +708,7 @@ export default function App() {
       ...formSiswa, scores, top, kelasId, kelasNama,
       tanggalAsesmen: new Date().toLocaleDateString("id-ID", { dateStyle: "long" }),
       narasi,
-      jenjang,
+      jenjang: formSiswa.jenjang || jenjang,
       gayaBelajar: {
         scores: gbScores,
         dominan: topGbId,
@@ -768,7 +768,7 @@ export default function App() {
   function resetAsesmen() {
     setAnswers({}); setGbAnswers({}); setCurrent(0);
     setAsesPhase("bakat");
-    setFormSiswa({nama:"",nisn:"",sekolah:"",tgl:""});
+    setFormSiswa({nama:"",nisn:"",sekolah:"",tgl:"",jenjang:"sma_x"});
     setSiswaSchool(null);
     setPhaseRaw("landing");
     navigate("landing");
@@ -837,7 +837,7 @@ export default function App() {
             onBatal={() => setPhase("landing")}
           />
         )}
-        {phase === "form" && <FormSiswa siswa={formSiswa} onChange={setFormSiswa} siswaSchool={siswaSchool} onLanjut={() => {
+        {phase === "form" && <FormSiswa siswa={formSiswa} onChange={setFormSiswa} siswaSchool={siswaSchool} jenjangAdmin={jenjang} onLanjut={() => {
           setCurrent(0); setAnswers({}); setGbAnswers({}); setAsesPhase("bakat");
           const q = questions.length > 0 ? questions : QUESTIONS;
           setShuffled([...q].sort(() => Math.random() - 0.5));
@@ -1159,8 +1159,8 @@ function InputKodeSekolah({onValid, onBatal}) {
 // ══════════════════════════════════════════
 // FORM SISWA
 // ══════════════════════════════════════════
-function FormSiswa({siswa,onChange,onLanjut,siswaSchool}) {
-  const valid = siswa.nama && siswa.nisn && siswa.sekolah;
+function FormSiswa({siswa,onChange,onLanjut,siswaSchool,jenjangAdmin}) {
+  const valid = siswa.nama && siswa.nisn && siswa.sekolah && siswa.jenjang;
   return (
     <div style={{display:"flex",justifyContent:"center"}}>
       <div style={{...S.card,maxWidth:520,width:"100%"}}>
@@ -1186,6 +1186,26 @@ function FormSiswa({siswa,onChange,onLanjut,siswaSchool}) {
               onChange={e=>onChange({...siswa,[key]:e.target.value})} maxLength={key==="nisn"?10:undefined}/>
           </div>
         ))}
+        <div style={S.fg}>
+          <label style={S.lbl}>🎓 Jenjang / Program *</label>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
+            {JENJANG_LIST.map(j=>(
+              <div key={j.id} onClick={()=>onChange({...siswa,jenjang:j.id})} style={{
+                border:"2px solid "+(siswa.jenjang===j.id?"#3B82F6":"#1E293B"),
+                background:siswa.jenjang===j.id?"#1E3A5F":"#0B1120",
+                borderRadius:10,padding:"10px 14px",cursor:"pointer",
+                display:"flex",alignItems:"center",gap:12,transition:"all 0.15s"
+              }}>
+                <span style={{fontSize:22}}>{j.icon}</span>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,color:siswa.jenjang===j.id?"#60A5FA":"#CBD5E1",fontSize:13}}>{j.label}</div>
+                  <div style={{fontSize:11,color:"#475569",marginTop:1}}>{j.subtitle}</div>
+                </div>
+                {siswa.jenjang===j.id&&<span style={{color:"#3B82F6",fontWeight:900,fontSize:16}}>✓</span>}
+              </div>
+            ))}
+          </div>
+        </div>
         <button style={{...S.cta,width:"100%",marginTop:14,opacity:valid?1:0.4,cursor:valid?"pointer":"not-allowed"}}
           disabled={!valid} onClick={onLanjut}>Lanjutkan ke Asesmen →</button>
       </div>
