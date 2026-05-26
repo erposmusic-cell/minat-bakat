@@ -449,7 +449,17 @@ export default function OwnerDashboard({ auth, onLogout }) {
                           </span>
                         </td>
                         <td style={S.td}>
-                          {pk ? <span style={{ color:pk.warna, fontWeight:700, fontSize:12 }}>{pk.nama}</span> : <span style={{ color:"#334155", fontSize:11 }}>—</span>}
+                          {pk
+                            ? <span style={{ color:pk.warna, fontWeight:700, fontSize:12 }}>{pk.nama}</span>
+                            : s.paket_pilihan
+                              ? (() => {
+                                  const pp = getPaketById(s.paket_pilihan);
+                                  return pp
+                                    ? <span style={{ color:pp.warna, fontWeight:700, fontSize:12, opacity:0.6 }} title="Paket dipilih saat daftar, belum berlisensi">{pp.nama} <span style={{fontSize:10,color:"#475569"}}>(pilihan)</span></span>
+                                    : <span style={{ color:"#475569", fontSize:11 }}>{s.paket_pilihan}</span>;
+                                })()
+                              : <span style={{ color:"#334155", fontSize:11 }}>—</span>
+                          }
                         </td>
                         <td style={S.td}>
                           {st ? <span style={{ background:st.bg, color:st.color, borderRadius:20, padding:"3px 10px", fontSize:11, fontWeight:700 }}>{st.label}</span>
