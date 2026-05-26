@@ -278,67 +278,22 @@ export async function fetchTarget(schoolId) {
   const { data, error } = await supabase
     .from("target_penerimaan").select("*").eq("school_id", schoolId).maybeSingle();
   if (error) throw error;
-  const defaults = {
-    min: 120, max: 175,
-    perJenjang: {
-      smp:    { min: 100, max: 150 },
-      sma_x:  { min: 120, max: 175 },
-      sma_xi: { min: 80,  max: 120 },
-    },
-  };
-  if (!data) return defaults;
-  return {
-    min: data.min,
-    max: data.max,
-    perJenjang: {
-      smp:    { min: data.smp_min    ?? 100, max: data.smp_max    ?? 150 },
-      sma_x:  { min: data.sma_x_min  ?? 120, max: data.sma_x_max  ?? 175 },
-      sma_xi: { min: data.sma_xi_min ?? 80,  max: data.sma_xi_max ?? 120 },
-    },
-  };
+  if (!data) return { min: 120, max: 175 };
+  return { min: data.min, max: data.max };
 }
 
-export async function saveTarget(min, max, schoolId, perJenjang) {
-  const pj = perJenjang || {};
-  const fields = {
-    min, max,
-    school_id:  schoolId,
-    smp_min:    pj.smp?.min    ?? 100,
-    smp_max:    pj.smp?.max    ?? 150,
-    sma_x_min:  pj.sma_x?.min  ?? 120,
-    sma_x_max:  pj.sma_x?.max  ?? 175,
-    sma_xi_min: pj.sma_xi?.min ?? 80,
-    sma_xi_max: pj.sma_xi?.max ?? 120,
-    updated_at: new Date().toISOString(),
-  };
-
-  // Cari row berdasarkan school_id dulu
-  const { data: bySchool } = await supabase
+export async function saveTarget(min, max, schoolId) {
+  const { data: existing } = await supabase
     .from("target_penerimaan").select("id").eq("school_id", schoolId).maybeSingle();
-
-  if (bySchool?.id) {
-    // Row dengan school_id ini sudah ada → UPDATE
+  if (existing) {
     const { error } = await supabase.from("target_penerimaan")
-      .update(fields).eq("id", bySchool.id);
+      .update({ min, max, updated_at: new Date().toISOString() }).eq("id", existing.id);
     if (error) throw error;
-    return;
-  }
-
-  // Cari row manapun yang belum punya school_id (row seed lama id=1)
-  const { data: orphan } = await supabase
-    .from("target_penerimaan").select("id").is("school_id", null).limit(1).maybeSingle();
-
-  if (orphan?.id) {
-    // Klaim row lama dengan menyuntikkan school_id
+  } else {
     const { error } = await supabase.from("target_penerimaan")
-      .update(fields).eq("id", orphan.id);
+      .insert({ min, max, school_id: schoolId, updated_at: new Date().toISOString() });
     if (error) throw error;
-    return;
   }
-
-  // Benar-benar belum ada row → INSERT
-  const { error } = await supabase.from("target_penerimaan").insert(fields);
-  if (error) throw error;
 }
 
 // ══════════════════════════════════════════
@@ -353,6 +308,25 @@ export async function fetchSiswa(schoolId) {
 }
 
 export async function insertSiswa(siswa, schoolId) {
+  // ── Validasi kuota SEBELUM insert (cek langsung ke DB, bukan dari state) ──
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: lisensiAll } = await supabase
+    .from("lisensi").select("maks_siswa, tgl_expired")
+    .eq("school_id", schoolId).order("created_at", { ascending: false });
+  const lisensiAktif = (lisensiAll || []).find(l => !l.tgl_expired || l.tgl_expired >= today);
+
+  if (lisensiAktif && lisensiAktif.maks_siswa !== null) {
+    const { count } = await supabase
+      .from("siswa").select("id", { count: "exact", head: true })
+      .eq("school_id", schoolId);
+    const terpakai = count || 0;
+    if (terpakai >= lisensiAktif.maks_siswa) {
+      throw new Error(
+        `KUOTA_PENUH:Kuota siswa paket Anda sudah penuh (${terpakai}/${lisensiAktif.maks_siswa} siswa). Hubungi admin untuk upgrade paket.`
+      );
+    }
+  }
+  // ── Insert ──
   const row = { ...siswaToDbRow(siswa), school_id: schoolId };
   const { error } = await supabase.from("siswa").insert(row);
   if (error) throw error;
