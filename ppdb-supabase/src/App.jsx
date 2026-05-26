@@ -739,7 +739,13 @@ export default function App() {
       await insertSiswa(rec, sid);
       if (auth?.role === "panitia") await loadAllData();
     } catch(e) {
-      console.error("Gagal simpan ke Supabase:", e.message);
+      if (e.message?.startsWith("KUOTA_PENUH:")) {
+        const msg = e.message.replace("KUOTA_PENUH:", "");
+        // Tetap tampilkan hasil asesmen, tapi beri tahu kuota penuh
+        setTimeout(() => alert("⚠️ Data asesmen tidak tersimpan!\n\n" + msg), 300);
+      } else {
+        console.error("Gagal simpan ke Supabase:", e.message);
+      }
     }
   }
 
