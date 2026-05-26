@@ -838,7 +838,7 @@ export default function App() {
       <div style={S.root}>
         <Topbar auth={auth} phase={phase} setPhase={setPhase} setAuth={setAuth} daftar={daftar} tab={tab} setTab={setTab} questions={questions}/>
         <main style={S.main} className="main-resp">
-          <SetupWizard kelas={kelas} target={target} jenjang={jenjang} onSaveKelas={handleSaveKelas} onSaveTarget={handleSaveTarget} onSaveJenjang={setJenjang} onDone={()=>setSetupDone(true)} dbLoading={dbLoading}/>
+          <SetupWizard kelas={kelas} target={target} jenjang={jenjang} maksSiswa={auth?.maksSiswa ?? null} onSaveKelas={handleSaveKelas} onSaveTarget={handleSaveTarget} onSaveJenjang={setJenjang} onDone={()=>setSetupDone(true)} dbLoading={dbLoading}/>
         </main>
       </div>
     );
@@ -992,18 +992,80 @@ function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab,questions}) {
 // ══════════════════════════════════════════
 // SETUP WIZARD
 // ══════════════════════════════════════════
-function SetupWizard({kelas,target,jenjang,onSaveKelas,onSaveTarget,onSaveJenjang,onDone,dbLoading}) {
-  const [step,setStep]=useState(0); // step 0 = pilih jenjang
+function SetupWizard({kelas,target,jenjang,maksSiswa,onSaveKelas,onSaveTarget,onSaveJenjang,onDone,dbLoading}) {
+  const [step,setStep]=useState(0);
   const [lj,setLj]=useState(jenjang||"sma_x");
-  const [lt,setLt]=useState({...target});
+  const [lt,setLt]=useState({
+    min: target.min || 120,
+    max: target.max || 175,
+    perJenjang: target.perJenjang || {
+      smp:    { min: null, max: null },
+      sma_x:  { min: target.min || 120, max: target.max || 175 },
+      sma_xi: { min: null, max: null },
+    }
+  });
   const [lk,setLk]=useState(kelas.map(k=>({...k, jenjang: k.jenjang || "sma_x"})));
+
   const totalKap = lk.reduce((s,k)=>s+k.kapasitas,0);
-  const stColor  = totalKap<lt.min?"#EF4444":totalKap>lt.max?"#F59E0B":"#10B981";
-  const stMsg    = totalKap<lt.min?"⚠️ Kurang "+(lt.min-totalKap)+" kursi":totalKap>lt.max?"⚠️ Kelebihan "+(totalKap-lt.max)+" kursi":"✅ Kapasitas ideal — "+totalKap+" kursi";
-  function updK(i,f,v){ setLk(prev=>prev.map((k,idx)=>idx===i?{...k,[f]:f==="kapasitas"?parseInt(v)||0:v}:k)); }
-  function addK(){ setLk(prev=>[...prev,{id:"k"+Date.now(),nama:"",bidang:"sains",kapasitas:30,wali:"",jenjang:lj}]); }
+  const totalMin = Object.values(lt.perJenjang).reduce((s,v)=>s+(v.min||0),0) || lt.min;
+  const totalMax = Object.values(lt.perJenjang).reduce((s,v)=>s+(v.max||0),0) || lt.max;
+
+  // Validasi vs paket lisensi
+  const kapMelebihi = maksSiswa !== null && totalKap > maksSiswa;
+  const targetMelebihi = maksSiswa !== null && totalMax > maksSiswa;
+  const stColor = kapMelebihi ? "#EF4444" : totalKap < totalMin ? "#EF4444" : totalKap > totalMax ? "#F59E0B" : "#10B981";
+  const stMsg   = kapMelebihi
+    ? `🔴 Melebihi kuota paket! Maks ${maksSiswa} siswa, total kursi ${totalKap}`
+    : totalKap < totalMin ? "⚠️ Kurang "+(totalMin-totalKap)+" kursi"
+    : totalKap > totalMax ? "⚠️ Kelebihan "+(totalKap-totalMax)+" kursi"
+    : "✅ Kapasitas ideal — "+totalKap+" kursi";
+
+  function updPJ(jid, field, val) {
+    const angka = parseInt(val) || null;
+    // Batasi max tidak melebihi maksSiswa
+    const safe = maksSiswa !== null && angka !== null && field === "max" && angka > maksSiswa ? maksSiswa : angka;
+    setLt(prev => ({
+      ...prev,
+      perJenjang: { ...prev.perJenjang, [jid]: { ...prev.perJenjang[jid], [field]: safe } }
+    }));
+  }
+
+  function updK(i,f,v){
+    setLk(prev=>prev.map((k,idx)=>{
+      if(idx!==i) return k;
+      let val = f==="kapasitas" ? parseInt(v)||0 : v;
+      // Batasi kapasitas kelas agar total tidak melebihi maksSiswa
+      if(f==="kapasitas" && maksSiswa !== null) {
+        const totalTanpaIni = prev.reduce((s,kk,ii)=>ii===i?s:s+kk.kapasitas, 0);
+        if(totalTanpaIni + val > maksSiswa) val = Math.max(0, maksSiswa - totalTanpaIni);
+      }
+      return {...k,[f]:val};
+    }));
+  }
+  function addK(){
+    if(maksSiswa !== null && totalKap >= maksSiswa) {
+      alert(`❌ Total kapasitas kelas sudah mencapai batas paket (${maksSiswa} siswa).`);
+      return;
+    }
+    setLk(prev=>[...prev,{id:"k"+Date.now(),nama:"",bidang:"sains",kapasitas:Math.min(30, maksSiswa?maksSiswa-totalKap:30),wali:"",jenjang:lj}]);
+  }
   function delK(i){ if(lk.length>1) setLk(prev=>prev.filter((_,idx)=>idx!==i)); }
-  async function finish(){ await onSaveKelas(lk); await onSaveTarget(lt.min, lt.max); await onSaveJenjang(lj); onDone(); }
+
+  function calcGlobal() {
+    const pj = lt.perJenjang;
+    const minTotal = (pj.smp.min||0) + (pj.sma_x.min||0) + (pj.sma_xi.min||0);
+    const maxTotal = (pj.smp.max||0) + (pj.sma_x.max||0) + (pj.sma_xi.max||0);
+    return { min: minTotal || lt.min, max: maxTotal || lt.max };
+  }
+
+  async function finish() {
+    if (kapMelebihi) { alert(`❌ Total kapasitas kelas (${totalKap}) melebihi kuota paket (${maksSiswa} siswa). Kurangi kapasitas atau jumlah kelas.`); return; }
+    const global = calcGlobal();
+    await onSaveKelas(lk);
+    await onSaveTarget(global.min, global.max, lt.perJenjang);
+    await onSaveJenjang(lj);
+    onDone();
+  }
   const jenjangInfo = JENJANG_LIST.find(j=>j.id===lj);
   return (
     <div style={{maxWidth:660,margin:"0 auto",display:"flex",flexDirection:"column",gap:20}}>
@@ -1037,24 +1099,74 @@ function SetupWizard({kelas,target,jenjang,onSaveKelas,onSaveTarget,onSaveJenjan
       )}
       {step===1&&(
         <div style={S.card}>
-          <h3 style={S.cardTitle}>🎯 Target Penerimaan</h3>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:16}}>
-            <div style={S.fg}><label style={S.lbl}>Minimum</label><input style={S.inp} type="number" value={lt.min} onChange={e=>setLt({...lt,min:parseInt(e.target.value)||0})}/></div>
-            <div style={S.fg}><label style={S.lbl}>Maksimum</label><input style={S.inp} type="number" value={lt.max} onChange={e=>setLt({...lt,max:parseInt(e.target.value)||0})}/></div>
-          </div>
-          <button style={{...S.cta,width:"100%"}} onClick={()=>setStep(2)} disabled={lt.min<=0||lt.max<lt.min}>Lanjut: Atur Kelas →</button>
+          <h3 style={S.cardTitle}>🎯 Target Penerimaan Per Jenjang</h3>
+          {maksSiswa !== null && (
+            <div style={{background:"#1E3A5F",border:"1px solid #3B82F666",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#93C5FD"}}>
+              📦 Batas paket: <strong style={{color:"#60A5FA"}}>{maksSiswa} siswa total</strong> — jumlah semua jenjang tidak boleh melebihi ini.
+            </div>
+          )}
+          <p style={{color:"#475569",fontSize:13,marginBottom:14}}>Isi target untuk jenjang yang dibuka. Kosongkan jenjang yang tidak digunakan.</p>
+          {JENJANG_LIST.map(j=>{
+            const pj = lt.perJenjang?.[j.id] || { min: null, max: null };
+            const kelasJ = lk.filter(k=>(k.jenjang||"sma_x")===j.id);
+            const kapJ = kelasJ.reduce((s,k)=>s+k.kapasitas,0);
+            return (
+              <div key={j.id} style={{background:"#0B1120",border:"1px solid #1E293B",borderRadius:12,padding:14,marginBottom:12}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                  <span style={{fontSize:20}}>{j.icon}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,color:"#E2E8F0",fontSize:13}}>{j.label}</div>
+                    <div style={{fontSize:11,color:"#475569"}}>{j.subtitle}{kapJ>0?` · ${kapJ} kursi tersedia`:""}</div>
+                  </div>
+                  {pj.min && pj.max && <span style={{fontSize:11,color:"#10B981",fontWeight:700}}>✓ Aktif</span>}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                  <div style={S.fg}>
+                    <label style={S.lbl}>Minimum siswa</label>
+                    <input style={S.inp} type="number" placeholder="Kosongkan jika tidak ada"
+                      value={pj.min??""} min={0} max={maksSiswa??undefined}
+                      onChange={e=>updPJ(j.id,"min",e.target.value||null)}/>
+                  </div>
+                  <div style={S.fg}>
+                    <label style={S.lbl}>Maksimum siswa{maksSiswa?` (maks ${maksSiswa})`:""}</label>
+                    <input style={S.inp} type="number" placeholder="Kosongkan jika tidak ada"
+                      value={pj.max??""} min={0} max={maksSiswa??undefined}
+                      onChange={e=>updPJ(j.id,"max",e.target.value||null)}/>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {(()=>{const g=calcGlobal(); return g.max>0?(
+            <div style={{background: targetMelebihi?"#450A0A":"#0F172A",border:"1px solid "+(targetMelebihi?"#EF444466":"#1E3A5F"),borderRadius:10,padding:"10px 14px",fontSize:13,color:"#94A3B8",marginBottom:6}}>
+              📊 Total semua jenjang: <strong style={{color:targetMelebihi?"#EF4444":"#60A5FA"}}>{g.min}–{g.max} siswa</strong>
+              {targetMelebihi && <span style={{color:"#EF4444",marginLeft:8}}>⚠️ Melebihi batas paket ({maksSiswa})</span>}
+            </div>
+          ):null;})()}
+          <button style={{...S.cta,width:"100%",opacity:targetMelebihi?0.5:1}} onClick={()=>setStep(2)} disabled={targetMelebihi}>Lanjut: Atur Kelas →</button>
           <button style={{...S.ghost,width:"100%",marginTop:8}} onClick={()=>setStep(0)}>← Kembali ke Jenjang</button>
         </div>
       )}
       {step===2&&(
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          {/* Banner kuota paket */}
+          {maksSiswa !== null && (
+            <div style={{background: kapMelebihi?"#450A0A":"#0B1120", border:"1px solid "+(kapMelebihi?"#EF444466":"#1E3A5F"), borderRadius:12, padding:"10px 16px", display:"flex", justifyContent:"space-between", alignItems:"center", gap:8}}>
+              <div style={{fontSize:13, color: kapMelebihi?"#FCA5A5":"#94A3B8"}}>
+                📦 Kuota paket: <strong style={{color: kapMelebihi?"#EF4444":"#60A5FA"}}>{maksSiswa} siswa maks</strong>
+              </div>
+              <div style={{fontSize:13, fontWeight:700, color: kapMelebihi?"#EF4444": totalKap>= maksSiswa*0.9?"#F97316":"#10B981"}}>
+                {totalKap}/{maksSiswa} kursi
+              </div>
+            </div>
+          )}
           <div style={{background:"#0F172A",border:"1px solid "+stColor+"44",borderRadius:14,padding:16}}>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:8}}>
               <span style={{color:"#94A3B8"}}>Total: <strong style={{color:stColor}}>{totalKap} kursi</strong></span>
               <span style={{color:stColor,fontWeight:700}}>{stMsg}</span>
             </div>
             <div style={{height:9,background:"#1E293B",borderRadius:99,overflow:"hidden"}}>
-              <div style={{width:Math.min((totalKap/lt.max)*100,110)+"%",height:"100%",background:stColor,borderRadius:99}}/>
+              <div style={{width:Math.min((totalKap/(maksSiswa||totalMax||1))*100,110)+"%",height:"100%",background:stColor,borderRadius:99}}/>
             </div>
           </div>
           <div style={S.card}>
