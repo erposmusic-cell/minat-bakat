@@ -83,14 +83,7 @@ import OwnerDashboard from "./OwnerDashboard";
 // ══════════════════════════════════════════
 // KONSTANTA
 // ══════════════════════════════════════════
-const DEFAULT_TARGET = {
-  min: 120, max: 175,
-  perJenjang: {
-    smp:    { min: 100, max: 150 },
-    sma_x:  { min: 120, max: 175 },
-    sma_xi: { min: 80,  max: 120 },
-  },
-};
+const DEFAULT_TARGET = { min: 120, max: 175 };
 const DEFAULT_KELAS = [
   { id:"k1", nama:"X-A", bidang:"sains",    kapasitas:35, wali:"", jenjang:"sma_x" },
   { id:"k2", nama:"X-B", bidang:"sosial",   kapasitas:35, wali:"", jenjang:"sma_x" },
@@ -708,6 +701,12 @@ export default function App() {
   }
 
   async function handleSelesai() {
+    // ── Validasi kuota paket ──────────────────────────────
+    const maksSiswa = auth?.maksSiswa ?? null;
+    if (maksSiswa !== null && daftar.length >= maksSiswa) {
+      alert(`❌ Kuota siswa paket Anda sudah penuh (${maksSiswa} siswa).\nHubungi admin untuk upgrade paket.`);
+      return;
+    }
     const scores    = calcScores(answers);
     const top       = getTop(scores);
     const kelasId   = autoAssign(top, daftar, kelas, formSiswa.jenjang || jenjang);
@@ -753,11 +752,11 @@ export default function App() {
     setDbLoading(false);
   }
 
-  async function handleSaveTarget(min, max, perJenjang) {
+  async function handleSaveTarget(min, max) {
     setDbLoading(true);
     try {
-      await saveTarget(min, max, auth.school_id, perJenjang);
-      setTarget({ min, max, perJenjang: perJenjang || target.perJenjang });
+      await saveTarget(min, max, auth.school_id);
+      setTarget({min, max});
     } catch(e) { setDbError("Gagal simpan target: " + e.message); }
     setDbLoading(false);
   }
@@ -891,8 +890,16 @@ export default function App() {
             tab={tab} setTab={setTab}
             questions={questions}
             auth={auth}
+            maksSiswa={auth?.maksSiswa ?? null}
             onDetail={s=>{setViewSiswa(s);setPhase("result");}}
-            onBaru={()=>setPhase("landing")}
+            onBaru={()=>{
+              const maks = auth?.maksSiswa ?? null;
+              if (maks !== null && daftar.length >= maks) {
+                alert(`❌ Kuota siswa penuh (${maks} siswa).\nHubungi admin untuk upgrade paket.`);
+                return;
+              }
+              setPhase("landing");
+            }}
             onExport={()=>doExcelExport(daftar,kelas)}
             onSetupUlang={()=>setSetupDone(false)}
             onSaveKelas={handleSaveKelas}
@@ -982,24 +989,15 @@ function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab,questions}) {
 function SetupWizard({kelas,target,jenjang,onSaveKelas,onSaveTarget,onSaveJenjang,onDone,dbLoading}) {
   const [step,setStep]=useState(0); // step 0 = pilih jenjang
   const [lj,setLj]=useState(jenjang||"sma_x");
-  const defPJ = target?.perJenjang || DEFAULT_TARGET.perJenjang;
-  const [lt,setLt]=useState({
-    smp:    { min: defPJ.smp?.min    ?? 100, max: defPJ.smp?.max    ?? 150 },
-    sma_x:  { min: defPJ.sma_x?.min  ?? 120, max: defPJ.sma_x?.max  ?? 175 },
-    sma_xi: { min: defPJ.sma_xi?.min ?? 80,  max: defPJ.sma_xi?.max ?? 120 },
-  });
+  const [lt,setLt]=useState({...target});
   const [lk,setLk]=useState(kelas.map(k=>({...k, jenjang: k.jenjang || "sma_x"})));
   const totalKap = lk.reduce((s,k)=>s+k.kapasitas,0);
-  const activeTarget = lt[lj] || lt.sma_x;
-  const stColor  = totalKap<activeTarget.min?"#EF4444":totalKap>activeTarget.max?"#F59E0B":"#10B981";
-  const stMsg    = totalKap<activeTarget.min?"⚠️ Kurang "+(activeTarget.min-totalKap)+" kursi":totalKap>activeTarget.max?"⚠️ Kelebihan "+(totalKap-activeTarget.max)+" kursi":"✅ Kapasitas ideal — "+totalKap+" kursi";
+  const stColor  = totalKap<lt.min?"#EF4444":totalKap>lt.max?"#F59E0B":"#10B981";
+  const stMsg    = totalKap<lt.min?"⚠️ Kurang "+(lt.min-totalKap)+" kursi":totalKap>lt.max?"⚠️ Kelebihan "+(totalKap-lt.max)+" kursi":"✅ Kapasitas ideal — "+totalKap+" kursi";
   function updK(i,f,v){ setLk(prev=>prev.map((k,idx)=>idx===i?{...k,[f]:f==="kapasitas"?parseInt(v)||0:v}:k)); }
   function addK(){ setLk(prev=>[...prev,{id:"k"+Date.now(),nama:"",bidang:"sains",kapasitas:30,wali:"",jenjang:lj}]); }
   function delK(i){ if(lk.length>1) setLk(prev=>prev.filter((_,idx)=>idx!==i)); }
-  // Hitung min/max global = jumlah semua jenjang
-  const globalMin = Object.values(lt).reduce((s,v)=>s+(v.min||0),0);
-  const globalMax = Object.values(lt).reduce((s,v)=>s+(v.max||0),0);
-  async function finish(){ await onSaveKelas(lk); await onSaveTarget(globalMin, globalMax, lt); await onSaveJenjang(lj); onDone(); }
+  async function finish(){ await onSaveKelas(lk); await onSaveTarget(lt.min, lt.max); await onSaveJenjang(lj); onDone(); }
   const jenjangInfo = JENJANG_LIST.find(j=>j.id===lj);
   return (
     <div style={{maxWidth:660,margin:"0 auto",display:"flex",flexDirection:"column",gap:20}}>
@@ -1033,42 +1031,12 @@ function SetupWizard({kelas,target,jenjang,onSaveKelas,onSaveTarget,onSaveJenjan
       )}
       {step===1&&(
         <div style={S.card}>
-          <h3 style={S.cardTitle}>🎯 Target Penerimaan Per Jenjang</h3>
-          <p style={{color:"#475569",fontSize:13,marginBottom:16}}>Atur jumlah siswa minimum dan maksimum untuk masing-masing jenjang</p>
-          <div style={{display:"flex",flexDirection:"column",gap:14,marginBottom:18}}>
-            {JENJANG_LIST.map(j=>(
-              <div key={j.id} style={{background:"#0B1120",border:"1px solid #1E293B",borderRadius:12,padding:14}}>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                  <span style={{fontSize:20}}>{j.icon}</span>
-                  <div>
-                    <div style={{fontWeight:700,color:"#E2E8F0",fontSize:13}}>{j.label}</div>
-                    <div style={{fontSize:11,color:"#475569"}}>{j.subtitle}</div>
-                  </div>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                  <div style={S.fg}>
-                    <label style={S.lbl}>Minimum</label>
-                    <input style={S.inp} type="number" min={0}
-                      value={lt[j.id]?.min ?? 0}
-                      onChange={e=>setLt(prev=>({...prev,[j.id]:{...prev[j.id],min:parseInt(e.target.value)||0}}))}/>
-                  </div>
-                  <div style={S.fg}>
-                    <label style={S.lbl}>Maksimum</label>
-                    <input style={S.inp} type="number" min={0}
-                      value={lt[j.id]?.max ?? 0}
-                      onChange={e=>setLt(prev=>({...prev,[j.id]:{...prev[j.id],max:parseInt(e.target.value)||0}}))}/>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <h3 style={S.cardTitle}>🎯 Target Penerimaan</h3>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:16}}>
+            <div style={S.fg}><label style={S.lbl}>Minimum</label><input style={S.inp} type="number" value={lt.min} onChange={e=>setLt({...lt,min:parseInt(e.target.value)||0})}/></div>
+            <div style={S.fg}><label style={S.lbl}>Maksimum</label><input style={S.inp} type="number" value={lt.max} onChange={e=>setLt({...lt,max:parseInt(e.target.value)||0})}/></div>
           </div>
-          <div style={{background:"#0F172A",borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:12,color:"#94A3B8"}}>
-            Total gabungan: <strong style={{color:"#60A5FA"}}>{globalMin}–{globalMax} siswa</strong> dari semua jenjang
-          </div>
-          <button style={{...S.cta,width:"100%"}} onClick={()=>setStep(2)}
-            disabled={JENJANG_LIST.some(j=>!lt[j.id]||lt[j.id].min<=0||lt[j.id].max<lt[j.id].min)}>
-            Lanjut: Atur Kelas →
-          </button>
+          <button style={{...S.cta,width:"100%"}} onClick={()=>setStep(2)} disabled={lt.min<=0||lt.max<lt.min}>Lanjut: Atur Kelas →</button>
           <button style={{...S.ghost,width:"100%",marginTop:8}} onClick={()=>setStep(0)}>← Kembali ke Jenjang</button>
         </div>
       )}
@@ -1855,9 +1823,9 @@ function KodeBanner({kode, namaSekolah}) {
 // ══════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════
-function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDetail,onBaru,onExport,onSetupUlang,onSaveKelas,onDeleteKelas,onUpdateKelasSiswa,onRefresh,dbLoading,logoSekolah,onSaveLogo,tahunAjaran,onSaveTahun}) {
+function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,maksSiswa,onDetail,onBaru,onExport,onSetupUlang,onSaveKelas,onDeleteKelas,onUpdateKelasSiswa,onRefresh,dbLoading,logoSekolah,onSaveLogo,tahunAjaran,onSaveTahun}) {
   const isUtama = auth?.role_admin === "admin_utama";
-  if(tab==="data")  return <DaftarSiswa daftar={daftar} kelas={kelas} onDetail={onDetail} onBaru={onBaru} onExport={onExport} onUpdateKelasSiswa={onUpdateKelasSiswa} isUtama={isUtama} logoSekolah={logoSekolah} tahunAjaran={tahunAjaran} auth={auth}/>;
+  if(tab==="data")  return <DaftarSiswa daftar={daftar} kelas={kelas} onDetail={onDetail} onBaru={onBaru} onExport={onExport} onUpdateKelasSiswa={onUpdateKelasSiswa} isUtama={isUtama} logoSekolah={logoSekolah} tahunAjaran={tahunAjaran} auth={auth} maksSiswa={maksSiswa}/>;
   if(tab==="soal")  return (
     <ManajemenSoal
       soal={questions}
@@ -1869,6 +1837,11 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
   if(tab==="kelas") return <ManajemenKelas kelas={kelas} daftar={daftar} setDaftar={setDaftar} target={target} onSaveKelas={onSaveKelas} onDeleteKelas={onDeleteKelas} dbLoading={dbLoading}/>;
   if(tab==="admin" && isUtama) return <KelolAdmin auth={auth}/>;
   if(tab==="logo"  && isUtama) return <PengaturanLogo auth={auth} logoSekolah={logoSekolah} onSaveLogo={onSaveLogo} tahunAjaran={tahunAjaran} onSaveTahun={onSaveTahun}/>;
+
+  // ── Kuota siswa ──
+  const kuotaPenuh  = maksSiswa !== null && daftar.length >= maksSiswa;
+  const kuotaHampir = maksSiswa !== null && !kuotaPenuh && daftar.length >= Math.floor(maksSiswa * 0.9);
+  const sisaKuota   = maksSiswa !== null ? maksSiswa - daftar.length : null;
 
   const counts={}; CAT.forEach(c=>counts[c.id]=0);
   daftar.forEach(s=>{if(s.top[0])counts[s.top[0].id]++;});
@@ -1883,9 +1856,8 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
     const kelasj  = kelas.filter(k => (k.jenjang||"sma_x") === j.id);
     const kapj    = kelasj.reduce((s,k)=>s+k.kapasitas,0);
     const terisi  = siswaj.filter(s=>s.kelasId).length;
-    const tMin    = target?.perJenjang?.[j.id]?.min ?? 0;
-    const tMax    = target?.perJenjang?.[j.id]?.max ?? kapj;
-    return { ...j, jumlahSiswa: siswaj.length, kapasitas: kapj, terisi, kelasCount: kelasj.length, tMin, tMax };
+    const tgt     = target.perJenjang?.[j.id];
+    return { ...j, jumlahSiswa: siswaj.length, kapasitas: kapj, terisi, kelasCount: kelasj.length, tgt };
   }).filter(j => j.jumlahSiswa > 0 || j.kelasCount > 0);
 
   return (
@@ -1893,17 +1865,55 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
       {auth?.kodeSekolah && (
         <KodeBanner kode={auth.kodeSekolah} namaSekolah={auth.namaSekolah} />
       )}
+
+      {/* ── Banner kuota paket ── */}
+      {kuotaPenuh && (
+        <div style={{background:"#450A0A",border:"1px solid #EF444466",borderRadius:12,padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:22}}>🔒</span>
+            <div>
+              <div style={{fontWeight:800,color:"#FCA5A5",fontSize:14}}>Kuota Paket Penuh</div>
+              <div style={{fontSize:12,color:"#F87171"}}>Sudah {daftar.length}/{maksSiswa} siswa — tidak bisa tambah asesmen baru</div>
+            </div>
+          </div>
+          <div style={{fontSize:12,color:"#FCA5A5",background:"#7F1D1D",borderRadius:8,padding:"6px 12px",fontWeight:700}}>
+            Hubungi admin untuk upgrade paket
+          </div>
+        </div>
+      )}
+      {kuotaHampir && (
+        <div style={{background:"#431407",border:"1px solid #F9731666",borderRadius:12,padding:"10px 16px",display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:20}}>⚠️</span>
+          <div style={{fontSize:13,color:"#FD9A6A"}}>
+            Kuota hampir penuh — sisa <strong style={{color:"#FB923C"}}>{sisaKuota} siswa</strong> dari {maksSiswa} (paket aktif)
+          </div>
+        </div>
+      )}
+
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
         <div>
           <h2 style={S.cardTitle}>Dashboard Sekolah PPDB</h2>
-          <p style={{color:"#475569",fontSize:13,margin:0}}>Statistik real-time asesmen bakat & minat siswa</p>
+          <p style={{color:"#475569",fontSize:13,margin:0}}>Statistik real-time asesmen bakat & minat siswa
+            {maksSiswa !== null && <span style={{color: kuotaPenuh?"#EF4444":kuotaHampir?"#F97316":"#475569"}}> · Kuota: {daftar.length}/{maksSiswa}</span>}
+          </p>
         </div>
         <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
           <button style={S.ghost} onClick={onRefresh} disabled={dbLoading}>🔄 {dbLoading?"Memuat...":"Refresh"}</button>
           {auth?.role_admin==="admin_utama" && (
             <button style={S.ghost} onClick={onSetupUlang}>⚙️ Setup Ulang</button>
           )}
-          <button style={S.ghost} onClick={onBaru}>+ Asesmen Baru</button>
+          <button
+            style={{...S.ghost, opacity: kuotaPenuh ? 0.45 : 1, cursor: kuotaPenuh ? "not-allowed" : "pointer",
+              ...(kuotaPenuh ? {} : {}),
+              borderColor: kuotaHampir ? "#F9731688" : undefined,
+              color: kuotaHampir ? "#FB923C" : undefined,
+            }}
+            onClick={onBaru}
+            disabled={kuotaPenuh}
+            title={kuotaPenuh ? `Kuota penuh (${maksSiswa} siswa)` : undefined}
+          >
+            {kuotaPenuh ? "🔒 Kuota Penuh" : kuotaHampir ? `⚠️ + Asesmen Baru (sisa ${sisaKuota})` : "+ Asesmen Baru"}
+          </button>
           <button style={{...S.cta,padding:"9px 16px",fontSize:14}} onClick={onExport} disabled={daftar.length===0}>📥 Excel</button>
         </div>
       </div>
@@ -1933,11 +1943,8 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
           <div style={{fontSize:14,fontWeight:700,color:"#94A3B8"}}>📊 Progress Per Jenjang</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:10}}>
             {statsPerJenjang.map(j => {
-              const tMax = j.tMax || j.kapasitas || 1;
-              const tMin = j.tMin || 0;
-              const pct  = tMax > 0 ? Math.min(Math.round((j.jumlahSiswa / tMax) * 100), 100) : 0;
-              const col  = j.jumlahSiswa >= tMax ? "#EF4444" : j.jumlahSiswa >= tMin ? "#10B981" : "#3B82F6";
-              const statusLabel = j.jumlahSiswa >= tMax ? "PENUH" : j.jumlahSiswa >= tMin ? "TARGET ✓" : "PROSES";
+              const pct = j.kapasitas > 0 ? Math.min(Math.round((j.jumlahSiswa/j.kapasitas)*100),100) : 0;
+              const col = pct >= 100 ? "#EF4444" : pct >= 80 ? "#F59E0B" : "#10B981";
               return (
                 <div key={j.id} style={{background:"#0B1120",border:"1px solid #1E293B",borderRadius:12,padding:14}}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
@@ -1945,24 +1952,20 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,onDe
                       <span style={{fontSize:20}}>{j.icon}</span>
                       <div>
                         <div style={{fontSize:13,fontWeight:700,color:"#E2E8F0"}}>{j.label}</div>
-                        <div style={{fontSize:11,color:"#475569"}}>{j.kelasCount} kelas · {j.kapasitas} kursi · target {tMin}–{tMax}</div>
+                        <div style={{fontSize:11,color:"#475569"}}>{j.kelasCount} kelas · {j.kapasitas} kursi</div>
                       </div>
                     </div>
                     <div style={{textAlign:"right"}}>
                       <div style={{fontSize:18,fontWeight:900,color:col}}>{j.jumlahSiswa}</div>
-                      <div style={{fontSize:10,color:col,fontWeight:700}}>{statusLabel}</div>
+                      <div style={{fontSize:10,color:"#475569"}}>siswa</div>
                     </div>
                   </div>
-                  <div style={{height:7,background:"#1E293B",borderRadius:99,overflow:"hidden",position:"relative"}}>
-                    {/* garis min */}
-                    {tMin > 0 && tMax > 0 && (
-                      <div style={{position:"absolute",left:Math.min((tMin/tMax)*100,100)+"%",top:0,width:2,height:"100%",background:"#F59E0B55",zIndex:1}}/>
-                    )}
+                  <div style={{height:7,background:"#1E293B",borderRadius:99,overflow:"hidden"}}>
                     <div style={{width:pct+"%",height:"100%",background:col,borderRadius:99,transition:"width 0.6s"}}/>
                   </div>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#475569",marginTop:4}}>
                     <span>Ditempatkan: {j.terisi}</span>
-                    <span style={{color:col,fontWeight:700}}>{pct}% dari target maks</span>
+                    <span style={{color:col,fontWeight:700}}>{pct}% terisi</span>
                   </div>
                 </div>
               );
@@ -2147,7 +2150,6 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
   const totalTerisi=daftar.filter(s=>s.kelasId).length;
   const belum=daftar.filter(s=>!s.kelasId).length;
   const tMin=target?.min||0; const tMax=target?.max||totalKap;
-  const pj = target?.perJenjang || {};
 
   // Kelompokkan kelas per jenjang
   const kelasByJenjang = JENJANG_LIST.reduce((acc, j) => {
@@ -2217,11 +2219,7 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
         const kelasList = kelasByJenjang[j.id] || [];
         const kapJenjang = kelasList.reduce((s,k)=>s+k.kapasitas,0);
         const terisiJenjang = daftar.filter(s=>s.kelasId && kelasList.some(k=>k.id===s.kelasId)).length;
-        const siswajJenjang = daftar.filter(s=>(s.jenjang||"sma_x")===j.id).length;
-        const tMinJ = pj[j.id]?.min ?? 0;
-        const tMaxJ = pj[j.id]?.max ?? kapJenjang;
-        const pctJenjang = tMaxJ > 0 ? Math.min(Math.round((siswajJenjang/tMaxJ)*100),100) : 0;
-        const colJ = siswajJenjang >= tMaxJ ? "#EF4444" : siswajJenjang >= tMinJ ? "#10B981" : "#3B82F6";
+        const pctJenjang = kapJenjang > 0 ? Math.round((terisiJenjang/kapJenjang)*100) : 0;
         return (
           <div key={j.id} style={{display:"flex",flexDirection:"column",gap:10}}>
             {/* Header jenjang */}
@@ -2234,11 +2232,8 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
                 </div>
               </div>
               <div style={{textAlign:"right",flexShrink:0}}>
-                <div style={{fontSize:12,fontWeight:700,color:colJ}}>{siswajJenjang} / {tMaxJ} <span style={{color:"#475569",fontWeight:400,fontSize:10}}>siswa</span></div>
-                <div style={{fontSize:11,color:"#475569",marginTop:1}}>target {tMinJ}–{tMaxJ} · {pctJenjang}%</div>
-                <div style={{width:80,height:4,background:"#1E293B",borderRadius:99,overflow:"hidden",marginTop:4,marginLeft:"auto"}}>
-                  <div style={{width:pctJenjang+"%",height:"100%",background:colJ,borderRadius:99}}/>
-                </div>
+                <div style={{fontSize:12,color:"#60A5FA",fontWeight:700}}>{kelasList.length} kelas · {kapJenjang} kursi</div>
+                <div style={{fontSize:11,color:"#475569",marginTop:2}}>Terisi: {terisiJenjang} ({pctJenjang}%)</div>
               </div>
             </div>
 
@@ -2318,7 +2313,8 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
 // ══════════════════════════════════════════
 // DAFTAR SISWA
 // ══════════════════════════════════════════
-function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,isUtama,logoSekolah,tahunAjaran,auth}) {
+function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,isUtama,logoSekolah,tahunAjaran,auth,maksSiswa}) {
+  const kuotaPenuh = maksSiswa !== null && daftar.length >= maksSiswa;
   const [search,setSearch]=useState("");
   const [fCat,setFCat]=useState("all");
   const [fKelas,setFKelas]=useState("all");
@@ -2333,7 +2329,9 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,i
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
         <div><h2 style={S.cardTitle}>Data Peserta Asesmen</h2><p style={{color:"#475569",fontSize:13,margin:0}}>{daftar.length} siswa · {filtered.length} ditampilkan</p></div>
         <div style={{display:"flex",gap:7}}>
-          <button style={S.ghost} onClick={onBaru}>+ Siswa Baru</button>
+          <button style={{...S.ghost, opacity: kuotaPenuh?0.45:1, cursor: kuotaPenuh?"not-allowed":"pointer"}} onClick={onBaru} disabled={kuotaPenuh} title={kuotaPenuh?`Kuota penuh (${maksSiswa} siswa)`:undefined}>
+            {kuotaPenuh ? "🔒 Kuota Penuh" : "+ Siswa Baru"}
+          </button>
           <button style={{...S.cta,padding:"8px 14px",fontSize:13}} onClick={onExport} disabled={daftar.length===0}>📥 Excel</button>
           <button style={S.ghost} onClick={()=>daftar.forEach(s=>doPrintSiswa(s, logoSekolah, auth?.namaSekolah, tahunAjaran))} disabled={daftar.length===0}>🖨 Cetak</button>
         </div>
