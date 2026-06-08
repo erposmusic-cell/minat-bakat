@@ -297,8 +297,8 @@ function getTop(scores) {
 
 // Kata kunci mapel per bidang bakat untuk pencocokan
 const MAPEL_KEYWORDS = {
-  logika:   ["matematika","informatika","komputer","fisika","kimia","statistika","akuntansi","ekonomi"],
-  bahasa:   ["bahasa","indonesia","inggris","jerman","jepang","arab","sastra","jurnalistik","komunikasi"],
+  logika:   ["matematika","informatika","komputer","fisika","kimia","statistika","akuntansi","ekonomi","matematika lanjut"],
+  bahasa:   ["bahasa","indonesia","inggris","bahasa inggris lanjutan","jerman","bahasa jerman","jepang","arab","sastra","jurnalistik","komunikasi"],
   sains:    ["fisika","biologi","kimia","ipa","sains","kesehatan","lingkungan","geografi"],
   seni:     ["seni","musik","tari","desain","kriya","gambar","teater","budaya"],
   sosial:   ["sosiologi","sejarah","ips","pkn","geografi","ekonomi","sosial","politik","antropologi"],
@@ -2303,38 +2303,110 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,maks
 // ══════════════════════════════════════════
 
 // Komponen input mata pelajaran per kelas
+// ── Daftar mapel pilihan sekolah (sesuai konfigurasi kelas XI) ──
+const MAPEL_OPTIONS = [
+  { id: "mat_lanjut",  label: "Matematika Lanjut" },
+  { id: "matematika",  label: "Matematika" },
+  { id: "fisika",      label: "Fisika" },
+  { id: "biologi",     label: "Biologi" },
+  { id: "sosiologi",   label: "Sosiologi" },
+  { id: "bing_l",      label: "Bahasa Inggris Lanjutan" },
+  { id: "informatika", label: "Informatika" },
+  { id: "jerman",      label: "Bahasa Jerman" },
+];
+
 function MapelEditor({ mapel, onChange }) {
-  const [input, setInput] = useState("");
   const list = mapel || [];
-  function tambah() {
-    const val = input.trim();
+  const [showCustom, setShowCustom] = useState(false);
+  const [customInput, setCustomInput] = useState("");
+
+  function toggle(label) {
+    if (list.includes(label)) onChange(list.filter(mp => mp !== label));
+    else onChange([...list, label]);
+  }
+
+  function tambahCustom() {
+    const val = customInput.trim();
     if (!val || list.includes(val)) return;
     onChange([...list, val]);
-    setInput("");
+    setCustomInput("");
   }
-  function hapus(i) { onChange(list.filter((_,idx)=>idx!==i)); }
+
+  // mapel kustom = yang tidak ada di MAPEL_OPTIONS
+  const customMapel = list.filter(mp => !MAPEL_OPTIONS.some(o => o.label === mp));
+
   return (
     <div style={{marginTop:4}}>
       <label style={S.lbl}>📚 Mata Pelajaran Pilihan</label>
-      <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:7}}>
-        {list.map((mp,i)=>(
-          <span key={i} style={{background:"#1E3A5F",color:"#60A5FA",borderRadius:20,padding:"3px 10px",fontSize:12,fontWeight:600,display:"flex",alignItems:"center",gap:5}}>
-            {mp}
-            <button onClick={()=>hapus(i)} style={{background:"none",border:"none",color:"#94A3B8",cursor:"pointer",padding:0,lineHeight:1,fontSize:13}}>×</button>
-          </span>
-        ))}
-        {list.length===0 && <span style={{fontSize:11,color:"#334155"}}>Belum ada mata pelajaran</span>}
+      <div style={{
+        display:"grid",
+        gridTemplateColumns:"repeat(auto-fill,minmax(185px,1fr))",
+        gap:5,
+        marginBottom:8,
+        background:"#0B1829",
+        borderRadius:10,
+        padding:"10px 12px",
+        border:"1px solid #1E293B",
+      }}>
+        {MAPEL_OPTIONS.map(opt => {
+          const checked = list.includes(opt.label);
+          return (
+            <label key={opt.id} style={{
+              display:"flex",alignItems:"center",gap:8,cursor:"pointer",
+              padding:"6px 8px",borderRadius:8,
+              background: checked ? "#1E3A5F" : "transparent",
+              border: checked ? "1px solid #3B82F6" : "1px solid transparent",
+              transition:"all 0.15s",
+            }}>
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => toggle(opt.label)}
+                style={{width:15,height:15,accentColor:"#3B82F6",cursor:"pointer",flexShrink:0}}
+              />
+              <span style={{fontSize:13,fontWeight:checked?700:400,color:checked?"#60A5FA":"#94A3B8"}}>
+                {opt.label}
+              </span>
+            </label>
+          );
+        })}
       </div>
-      <div style={{display:"flex",gap:6}}>
-        <input
-          style={{...S.inp,padding:"7px 10px",fontSize:13}}
-          placeholder="Contoh: Matematika Lanjut"
-          value={input}
-          onChange={e=>setInput(e.target.value)}
-          onKeyDown={e=>e.key==="Enter"&&tambah()}
-        />
-        <button style={{...S.cta,padding:"7px 14px",fontSize:13,whiteSpace:"nowrap"}} onClick={tambah} disabled={!input.trim()}>+ Tambah</button>
-      </div>
+
+      {/* Mapel kustom yang sudah tersimpan */}
+      {customMapel.length > 0 && (
+        <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:7}}>
+          {customMapel.map((mp,i) => (
+            <span key={i} style={{background:"#1E3A5F",color:"#60A5FA",borderRadius:20,padding:"3px 10px",fontSize:12,fontWeight:600,display:"inline-flex",alignItems:"center",gap:5}}>
+              {mp}
+              <button onClick={()=>onChange(list.filter(x=>x!==mp))} style={{background:"none",border:"none",color:"#94A3B8",cursor:"pointer",padding:0,lineHeight:1,fontSize:13}}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Tambah mapel di luar daftar */}
+      {!showCustom ? (
+        <button style={{...S.ghost,padding:"5px 12px",fontSize:12,color:"#64748B",borderColor:"#1E293B"}} onClick={()=>setShowCustom(true)}>
+          + Mapel lainnya…
+        </button>
+      ) : (
+        <div style={{display:"flex",gap:6,alignItems:"center",marginTop:4}}>
+          <input
+            style={{...S.inp,padding:"6px 10px",fontSize:13}}
+            placeholder="Nama mapel lain…"
+            value={customInput}
+            autoFocus
+            onChange={e=>setCustomInput(e.target.value)}
+            onKeyDown={e=>e.key==="Enter"&&tambahCustom()}
+          />
+          <button style={{...S.cta,padding:"6px 12px",fontSize:13,whiteSpace:"nowrap"}} onClick={tambahCustom} disabled={!customInput.trim()}>+ Tambah</button>
+          <button style={{...S.ghost,padding:"6px 10px",fontSize:13}} onClick={()=>{setShowCustom(false);setCustomInput("");}}>Batal</button>
+        </div>
+      )}
+
+      {list.length === 0 && (
+        <div style={{fontSize:11,color:"#475569",marginTop:4}}>Belum ada mata pelajaran dipilih</div>
+      )}
     </div>
   );
 }
@@ -2408,7 +2480,9 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
             <div style={S.fg}><label style={S.lbl}>Bidang</label><select style={S.inp} value={newK.bidang} onChange={e=>setNewK({...newK,bidang:e.target.value})}>{CAT.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}</select></div>
             <div style={S.fg}><label style={S.lbl}>Wali Kelas</label><input style={S.inp} value={newK.wali} onChange={e=>setNewK({...newK,wali:e.target.value})}/></div>
           </div>
-          <div style={{gridColumn:"1/-1"}}><MapelEditor mapel={newK.mapel} onChange={v=>setNewK({...newK,mapel:v})}/></div>
+          {newK.jenjang !== "sma_x" && (
+            <div style={{gridColumn:"1/-1"}}><MapelEditor mapel={newK.mapel} onChange={v=>setNewK({...newK,mapel:v})}/></div>
+          )}
           <div style={{display:"flex",gap:8,marginTop:8}}><button style={S.cta} onClick={add} disabled={!newK.nama}>Tambah</button><button style={S.ghost} onClick={()=>setShowAdd(false)}>Batal</button></div>
         </div>
       )}
@@ -2463,7 +2537,9 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
                           <select style={S.inp} value={form.bidang||"sains"} onChange={e=>setForm({...form,bidang:e.target.value})}>{CAT.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}</select>
                           <input style={S.inp} type="number" value={form.kapasitas||30} onChange={e=>setForm({...form,kapasitas:e.target.value})}/>
                           <input style={S.inp} value={form.wali||""} onChange={e=>setForm({...form,wali:e.target.value})} placeholder="Wali kelas"/>
-                          <MapelEditor mapel={form.mapel||[]} onChange={v=>setForm({...form,mapel:v})}/>
+                          {(form.jenjang||"sma_x") !== "sma_x" && (
+                            <MapelEditor mapel={form.mapel||[]} onChange={v=>setForm({...form,mapel:v})}/>
+                          )}
                           <div style={{display:"flex",gap:6,marginTop:4}}>
                             <button style={{...S.cta,padding:"6px 13px",fontSize:12,opacity:dbLoading?0.6:1}} onClick={save} disabled={dbLoading}>✓ Simpan</button>
                             <button style={{...S.ghost,padding:"6px 11px",fontSize:12}} onClick={()=>setEditId(null)}>Batal</button>
