@@ -510,7 +510,7 @@ function doExcelExport(daftar, kelas) {
   XLSX.writeFile(wb,"PPDB_"+new Date().toLocaleDateString("id-ID").replace(/\//g,"-")+".xlsx");
 }
 
-function doPrintSiswa(siswa, logoBase64, namaSekolah, tahunAjaran) {
+function doPrintSiswa(siswa, logoBase64, namaSekolah, tahunAjaran, showKelas = false) {
   const t0 = siswa.top[0];
   const bars = CAT.map(c=>`
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
@@ -563,7 +563,7 @@ function doPrintSiswa(siswa, logoBase64, namaSekolah, tahunAjaran) {
         <span style="font-size:12px;color:#64748b">NISN: <strong style="color:#334155">${siswa.nisn}</strong></span>
         <span style="font-size:12px;color:#64748b">Asal: <strong style="color:#334155">${siswa.sekolah}</strong></span>
         <span style="font-size:12px;color:#64748b">Tanggal: <strong style="color:#334155">${siswa.tanggalAsesmen}</strong></span>
-        ${siswa.kelasNama?`<span style="font-size:12px;color:#3b82f6;font-weight:700">Kelas: ${siswa.kelasNama}</span>`:""}
+        ${showKelas && siswa.kelasNama?`<span style="font-size:12px;color:#3b82f6;font-weight:700">Kelas: ${siswa.kelasNama}</span>`:""}
       </div>
     </div>
   </div>
@@ -715,7 +715,7 @@ export default function App() {
     const gbScores  = calcGayaBelajar(gbAnswers);
     const [topGbId, topGbPct] = getTopGayaBelajar(gbScores);
     const topGbCat  = GAYA_BELAJAR_CAT.find(c => c.id === topGbId);
-    const jurusan   = getJurusan(jenjang);
+    const jurusan   = getJurusan(formSiswa.jenjang || jenjang);
     const rec = {
       ...formSiswa, scores, top, kelasId, kelasNama,
       tanggalAsesmen: new Date().toLocaleDateString("id-ID", { dateStyle: "long" }),
@@ -2451,7 +2451,7 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,i
             {kuotaPenuh ? "🔒 Kuota Penuh" : "+ Siswa Baru"}
           </button>
           <button style={{...S.cta,padding:"8px 14px",fontSize:13}} onClick={onExport} disabled={daftar.length===0}>📥 Excel</button>
-          <button style={S.ghost} onClick={()=>daftar.forEach(s=>doPrintSiswa(s, logoSekolah, auth?.namaSekolah, tahunAjaran))} disabled={daftar.length===0}>🖨 Cetak</button>
+          <button style={S.ghost} onClick={()=>daftar.forEach(s=>doPrintSiswa(s, logoSekolah, auth?.namaSekolah, tahunAjaran, true))} disabled={daftar.length===0}>🖨 Cetak</button>
         </div>
       </div>
       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -2513,7 +2513,7 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,i
                     <td style={S.td}>
                       <div style={{display:"flex",gap:5}}>
                         <button style={S.detBtn} onClick={()=>onDetail(s)}>Detail</button>
-                        <button style={{...S.detBtn,color:"#10B981",borderColor:"#10B98155"}} onClick={()=>doPrintSiswa(s, logoSekolah, auth?.namaSekolah, tahunAjaran)}>PDF</button>
+                        <button style={{...S.detBtn,color:"#10B981",borderColor:"#10B98155"}} onClick={()=>doPrintSiswa(s, logoSekolah, auth?.namaSekolah, tahunAjaran, true)}>PDF</button>
                         {isUtama && (
                           <button style={{...S.detBtn,color:"#EF4444",borderColor:"#EF444433"}}
                             onClick={async()=>{ if(!window.confirm("Hapus siswa ini?"))return; await deleteSiswa(s.id); setDaftar(p=>p.filter(x=>x.id!==s.id)); }}>🗑</button>
