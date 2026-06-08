@@ -416,8 +416,15 @@ function bulkAssign(daftar, kelas) {
     });
 
     // Ranking siswa berdasarkan skor tertinggi ke kelas #1 pilihan mereka
-    // (pakai skor ke kelas paling cocok sebagai nilai ranking)
-    siswaScored.sort((a, b) => (b.skorPerKelas[0]?.skor ?? 0) - (a.skorPerKelas[0]?.skor ?? 0));
+    // Primary  : skor kesesuaian mapel (bakat vs mapel kelas terbaik)
+    // Tiebreaker: skor bakat murni siswa (top[0].pct) — siswa dengan nilai asesmen lebih tinggi diprioritaskan
+    siswaScored.sort((a, b) => {
+      const skorA = a.skorPerKelas[0]?.skor ?? 0;
+      const skorB = b.skorPerKelas[0]?.skor ?? 0;
+      if (skorB !== skorA) return skorB - skorA;
+      // Tiebreaker: skor bakat murni dari asesmen
+      return (b.top?.[0]?.pct ?? 0) - (a.top?.[0]?.pct ?? 0);
+    });
 
     // Simulasi kursi tersedia (track terisi secara lokal)
     const terisiMap = {};
@@ -2708,7 +2715,7 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,i
     const mc=fCat==="all"||s.top[0]?.id===fCat;
     const mk=fKelas==="all"||(fKelas==="none"?!s.kelasId:s.kelasId===fKelas);
     return ms&&mc&&mk;
-  });
+  }).sort((a,b)=>(b.top?.[0]?.pct??0)-(a.top?.[0]?.pct??0));
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
