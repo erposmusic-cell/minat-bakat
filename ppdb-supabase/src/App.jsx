@@ -851,7 +851,7 @@ export default function App() {
         {phase === "landing" && <Landing onMulai={()=>setPhase(auth?.role==="panitia"?"form":"kode")} />}
         {phase === "kode" && (
           <InputKodeSekolah
-            onValid={(sekolah) => { setSiswaSchool(sekolah); if (sekolah.logo) setLogoSekolah(sekolah.logo); if (sekolah.tahun_ajaran) setTahunAjaran(sekolah.tahun_ajaran); setPhase("form"); }}
+            onValid={async (sekolah) => { setSiswaSchool(sekolah); if (sekolah.logo) setLogoSekolah(sekolah.logo); if (sekolah.tahun_ajaran) setTahunAjaran(sekolah.tahun_ajaran); try { const kd = await fetchKelas(sekolah.id); if (kd.length > 0) setKelas(kd); } catch(e) { console.error("Gagal load kelas:", e.message); } setPhase("form"); }}
             onBatal={() => setPhase("landing")}
           />
         )}
