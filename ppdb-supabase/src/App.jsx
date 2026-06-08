@@ -881,6 +881,8 @@ export default function App() {
       setDbLoading(false);
     }
   }
+
+  async function handleSaveKelas(kelasArr) {
     setDbLoading(true);
     try {
       await upsertKelas(kelasArr, auth.school_id);
