@@ -385,6 +385,73 @@ function autoAssign(top, daftar, kelas, jenjangSiswa) {
 }
 
 // ══════════════════════════════════════════
+// BULK ASSIGN — ranking semua siswa sekaligus
+// ══════════════════════════════════════════
+// Dipanggil admin setelah semua siswa selesai asesmen.
+// Proses: urutkan siswa per jenjang berdasarkan skor kesesuaian mapel (tertinggi duluan),
+// lalu tempatkan satu per satu ke kelas terbaik yang masih ada kursi.
+// Return: array { siswaId, kelasId, kelasNama } untuk semua siswa yang berhasil ditempatkan.
+function bulkAssign(daftar, kelas) {
+  // Pisahkan per jenjang
+  const jenjangList = [...new Set(daftar.map(s => s.jenjang || "sma_x"))];
+  const hasil = [];
+
+  jenjangList.forEach(jenjang => {
+    const siswaDijenjang = daftar.filter(s => (s.jenjang || "sma_x") === jenjang);
+    const kelasDijenjang = kelas.filter(k => !k.jenjang || k.jenjang === jenjang);
+    if (kelasDijenjang.length === 0) return;
+
+    // Hitung skor kesesuaian tiap siswa terhadap tiap kelas
+    const siswaScored = siswaDijenjang.map(s => {
+      const topArr = Array.isArray(s.top) ? s.top : [s.top];
+      const skorPerKelas = kelasDijenjang.map(k => ({
+        kelasId: k.id,
+        kelasNama: k.nama,
+        kapasitas: k.kapasitas || 0,
+        skor: hitungKesesuaianMapel(topArr, k.mapel || []) ?? 0,
+      }));
+      // Urutkan kelas terbaik untuk siswa ini
+      skorPerKelas.sort((a, b) => b.skor - a.skor);
+      return { ...s, skorPerKelas };
+    });
+
+    // Ranking siswa berdasarkan skor tertinggi ke kelas #1 pilihan mereka
+    // (pakai skor ke kelas paling cocok sebagai nilai ranking)
+    siswaScored.sort((a, b) => (b.skorPerKelas[0]?.skor ?? 0) - (a.skorPerKelas[0]?.skor ?? 0));
+
+    // Simulasi kursi tersedia (track terisi secara lokal)
+    const terisiMap = {};
+    kelasDijenjang.forEach(k => { terisiMap[k.id] = 0; });
+
+    // Siswa yang sudah punya kelas (manual/sebelumnya) — hitung dulu
+    daftar.forEach(s => {
+      if (s.kelasId && terisiMap[s.kelasId] !== undefined) terisiMap[s.kelasId]++;
+    });
+
+    // Reset — bulk assign hanya untuk siswa jenjang ini, mulai fresh
+    kelasDijenjang.forEach(k => { terisiMap[k.id] = 0; });
+
+    // Tempatkan siswa satu per satu dari ranking tertinggi
+    siswaScored.forEach(s => {
+      // Cari kelas terbaik yang masih ada kursi
+      const pilihan = s.skorPerKelas.find(kx => terisiMap[kx.kelasId] < kx.kapasitas);
+      if (pilihan) {
+        terisiMap[pilihan.kelasId]++;
+        hasil.push({ siswaId: s.id, kelasId: pilihan.kelasId, kelasNama: pilihan.kelasNama });
+      } else {
+        // Semua kelas penuh — masuk kelas dengan skor tertinggi (overflow)
+        const fallback = s.skorPerKelas[0];
+        if (fallback) {
+          hasil.push({ siswaId: s.id, kelasId: fallback.kelasId, kelasNama: fallback.kelasNama });
+        }
+      }
+    });
+  });
+
+  return hasil;
+}
+
+// ══════════════════════════════════════════
 // GENERATOR NARASI
 // ══════════════════════════════════════════
 const NARASI_DB = {
@@ -752,10 +819,11 @@ export default function App() {
         daftarLive = sd;
       } catch(e) { console.error("Gagal fetch live data:", e.message); }
     }
-    const assignResult = autoAssign(top, daftarLive, kelasLive, formSiswa.jenjang || jenjang);
-    const kelasId      = assignResult.kelasId;
-    const kelasNama    = kelasLive.find(k => k.id === kelasId)?.nama || null;
-    const kelasOverflow = assignResult.overflow;   // true = kelas penuh tapi siswa tetap dimasukkan
+    // Penempatan kelas dilakukan SETELAH semua siswa selesai asesmen (bulk ranking)
+    // Siswa disimpan tanpa kelas dulu — admin proses via tombol "Proses Penempatan"
+    const kelasId      = null;
+    const kelasNama    = null;
+    const kelasOverflow = false;
     const narasi    = generateNarasi(formSiswa.nama, scores, top);
     const gbScores  = calcGayaBelajar(gbAnswers);
     const [topGbId, topGbPct] = getTopGayaBelajar(gbScores);
@@ -794,7 +862,25 @@ export default function App() {
     }
   }
 
-  async function handleSaveKelas(kelasArr) {
+  async function handleBulkAssign() {
+    if (!window.confirm(`Proses penempatan kelas untuk ${daftar.filter(s=>!s.kelasId).length} siswa yang belum ditempatkan?\n\nSiswa akan diranking berdasarkan kesesuaian bakat dengan mapel kelas.`)) return;
+    setDbLoading(true);
+    try {
+      const hasilAssign = bulkAssign(daftar, kelas);
+      // Update ke Supabase satu per satu
+      await Promise.all(hasilAssign.map(h => updateKelasSiswa(h.siswaId, h.kelasId, h.kelasNama)));
+      // Update state lokal
+      setDaftar(prev => prev.map(s => {
+        const h = hasilAssign.find(x => x.siswaId === s.id);
+        return h ? { ...s, kelasId: h.kelasId, kelasNama: h.kelasNama } : s;
+      }));
+      alert(`✅ Penempatan selesai!\n${hasilAssign.length} siswa berhasil ditempatkan.`);
+    } catch(e) {
+      alert("❌ Gagal memproses penempatan: " + e.message);
+    } finally {
+      setDbLoading(false);
+    }
+  }
     setDbLoading(true);
     try {
       await upsertKelas(kelasArr, auth.school_id);
@@ -957,6 +1043,7 @@ export default function App() {
             onDeleteKelas={handleDeleteKelas}
             onUpdateKelasSiswa={handleUpdateKelasSiswa}
             onRefresh={loadAllData}
+            onBulkAssign={handleBulkAssign}
             dbLoading={dbLoading}
             logoSekolah={logoSekolah}
             onSaveLogo={async (base64) => { await uploadLogoSekolah(auth.school_id, base64); setLogoSekolah(base64); }}
@@ -2022,7 +2109,7 @@ function KodeBanner({kode, namaSekolah}) {
 // ══════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════
-function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,maksSiswa,onDetail,onBaru,onExport,onSetupUlang,onSaveKelas,onDeleteKelas,onUpdateKelasSiswa,onRefresh,dbLoading,logoSekolah,onSaveLogo,tahunAjaran,onSaveTahun}) {
+function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,maksSiswa,onDetail,onBaru,onExport,onSetupUlang,onSaveKelas,onDeleteKelas,onUpdateKelasSiswa,onRefresh,onBulkAssign,dbLoading,logoSekolah,onSaveLogo,tahunAjaran,onSaveTahun}) {
   const isUtama = auth?.role_admin === "admin_utama";
   if(tab==="data")  return <DaftarSiswa daftar={daftar} kelas={kelas} onDetail={onDetail} onBaru={onBaru} onExport={onExport} onUpdateKelasSiswa={onUpdateKelasSiswa} isUtama={isUtama} logoSekolah={logoSekolah} tahunAjaran={tahunAjaran} auth={auth} maksSiswa={maksSiswa}/>;
   if(tab==="soal")  return (
@@ -2033,7 +2120,7 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,maks
       onDelete={async (id) => { await deleteSoal(id); await onRefresh(); }}
     />
   );
-  if(tab==="kelas") return <ManajemenKelas kelas={kelas} daftar={daftar} setDaftar={setDaftar} target={target} onSaveKelas={onSaveKelas} onDeleteKelas={onDeleteKelas} dbLoading={dbLoading}/>;
+  if(tab==="kelas") return <ManajemenKelas kelas={kelas} daftar={daftar} setDaftar={setDaftar} target={target} onSaveKelas={onSaveKelas} onDeleteKelas={onDeleteKelas} onBulkAssign={onBulkAssign} dbLoading={dbLoading}/>;
   if(tab==="admin" && isUtama) return <KelolAdmin auth={auth}/>;
   if(tab==="logo"  && isUtama) return <PengaturanLogo auth={auth} logoSekolah={logoSekolah} onSaveLogo={onSaveLogo} tahunAjaran={tahunAjaran} onSaveTahun={onSaveTahun}/>;
 
@@ -2313,6 +2400,7 @@ const MAPEL_OPTIONS = [
   { id: "bing_l",      label: "Bahasa Inggris Lanjutan" },
   { id: "informatika", label: "Informatika" },
   { id: "jerman",      label: "Bahasa Jerman" },
+  { id: "geografi",    label: "Geografi" },
 ];
 
 function MapelEditor({ mapel, onChange }) {
@@ -2411,7 +2499,7 @@ function MapelEditor({ mapel, onChange }) {
   );
 }
 
-function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas,dbLoading}) {
+function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas,onBulkAssign,dbLoading}) {
   const [editId,setEditId]=useState(null);
   const [form,setForm]=useState({});
   const [showAdd,setShowAdd]=useState(false);
@@ -2440,7 +2528,27 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
           <h2 style={S.cardTitle}>🏫 Manajemen Kelas</h2>
           <p style={{color:"#475569",fontSize:13,margin:0}}>{kelas.length} kelas · {totalKap} kursi · target {tMin}–{tMax}</p>
         </div>
-        <button style={S.cta} onClick={()=>setShowAdd(!showAdd)}>+ Tambah Kelas</button>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          {belum > 0 && (
+            <button
+              style={{
+                ...S.cta,
+                background:"linear-gradient(135deg,#10B981,#059669)",
+                boxShadow:"0 0 12px #10B98144",
+                display:"flex",alignItems:"center",gap:7,
+                opacity:dbLoading?0.6:1,
+              }}
+              onClick={onBulkAssign}
+              disabled={dbLoading}
+            >
+              🎯 Proses Penempatan
+              <span style={{background:"#ffffff33",borderRadius:99,padding:"1px 8px",fontSize:11,fontWeight:800}}>
+                {belum} siswa
+              </span>
+            </button>
+          )}
+          <button style={S.cta} onClick={()=>setShowAdd(!showAdd)}>+ Tambah Kelas</button>
+        </div>
       </div>
       <div style={{background:"#0F172A",border:"1px solid #1E293B",borderRadius:14,padding:16}}>
         <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:8}}>
