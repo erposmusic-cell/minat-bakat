@@ -710,8 +710,19 @@ export default function App() {
     }
     const scores    = calcScores(answers);
     const top       = getTop(scores);
-    const kelasId   = autoAssign(top, daftar, kelas, formSiswa.jenjang || jenjang);
-    const kelasNama = kelas.find(k => k.id === kelasId)?.nama || null;
+    // Fetch kelas & siswa fresh dari Supabase agar autoAssign pakai data terkini
+    const schoolId  = auth?.school_id || siswaSchool?.id || null;
+    let kelasLive   = kelas;
+    let daftarLive  = daftar;
+    if (schoolId) {
+      try {
+        const [kd, sd] = await Promise.all([fetchKelas(schoolId), fetchSiswa(schoolId)]);
+        if (kd.length > 0) kelasLive = kd;
+        daftarLive = sd;
+      } catch(e) { console.error("Gagal fetch live data:", e.message); }
+    }
+    const kelasId   = autoAssign(top, daftarLive, kelasLive, formSiswa.jenjang || jenjang);
+    const kelasNama = kelasLive.find(k => k.id === kelasId)?.nama || null;
     const narasi    = generateNarasi(formSiswa.nama, scores, top);
     const gbScores  = calcGayaBelajar(gbAnswers);
     const [topGbId, topGbPct] = getTopGayaBelajar(gbScores);
