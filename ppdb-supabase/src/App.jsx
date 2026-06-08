@@ -67,6 +67,7 @@ import {
   saveTarget,
   fetchSiswa,
   insertSiswa,
+  deleteSiswa,
   updateKelasSiswa,
   fetchSoal,
   insertSoal,
