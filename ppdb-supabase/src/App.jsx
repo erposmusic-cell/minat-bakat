@@ -2483,17 +2483,21 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,i
                     <td style={S.td}><span style={{border:"1px solid "+t.color+"66",color:t.color,borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:600,display:"inline-block"}}>{t.icon} {t.label}</span></td>
                     <td style={{...S.td,color:t.color,fontWeight:700}}>{t.pct}%</td>
                     <td style={S.td}>
-                      {/* Dropdown kelas: hanya tampilkan kelas sesuai jenjang siswa */}
                       {(() => {
                         const jenjangSiswa = s.jenjang || "sma_x";
+                        // Kandidat: kelas sesuai jenjang siswa
                         const kelasFiltred = kelas.filter(kx => !kx.jenjang || kx.jenjang === jenjangSiswa);
                         const kelasCandidates = kelasFiltred.length > 0 ? kelasFiltred : kelas;
+                        // Pastikan kelas yang sudah ter-assign selalu masuk list meski tidak ada di filter
+                        const assignedKelas = s.kelasId && !kelasCandidates.find(kx=>kx.id===s.kelasId)
+                          ? kelas.find(kx=>kx.id===s.kelasId) : null;
+                        const allOptions = assignedKelas ? [assignedKelas, ...kelasCandidates] : kelasCandidates;
                         const k = kelas.find(x=>x.id===s.kelasId);
                         return (
                           <select style={{background:"#1E293B",border:"1px solid #334155",color:k?"#60A5FA":"#EF4444",borderRadius:8,padding:"4px 7px",fontSize:12,cursor:"pointer"}}
                             value={s.kelasId||""} onChange={e=>{const kid=e.target.value||null;const kn=kelas.find(x=>x.id===kid)?.nama||null;onUpdateKelasSiswa(s.id,kid,kn);}}>
                             <option value="">— Pilih —</option>
-                            {[...kelasCandidates]
+                            {[...allOptions]
                               .map(kx=>({
                                 ...kx,
                                 terisi:daftar.filter(ss=>ss.kelasId===kx.id).length,
