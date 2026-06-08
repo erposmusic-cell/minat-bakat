@@ -305,52 +305,83 @@ const MAPEL_KEYWORDS = {
   olahraga: ["olahraga","pjok","jasmani","kesehatan","atletik","penjas"],
 };
 
-// Hitung skor kesesuaian bakat siswa (top 3) dengan mapel kelas (0-100)
+// Hitung skor kesesuaian bakat siswa (top 3) dengan mapel pilihan kelas (0-100)
+// Perbaikan: normalisasi berbasis bobot bakat (bukan jumlah mapel),
+// sehingga kelas dengan banyak mapel tidak dirugikan dibanding kelas sedikit mapel.
 function hitungKesesuaianMapel(topBakat, mapelKelas) {
-  if (!mapelKelas || mapelKelas.length === 0) return null; // null = tidak ada mapel
+  if (!mapelKelas || mapelKelas.length === 0) return null;
   let totalSkor = 0;
   topBakat.forEach((t, i) => {
     const bobot = i === 0 ? 3 : i === 1 ? 2 : 1; // bakat #1 bobot 3, #2 bobot 2, #3 bobot 1
     const keywords = MAPEL_KEYWORDS[t.id] || [];
-    mapelKelas.forEach(mp => {
-      const mpLow = mp.toLowerCase();
-      if (keywords.some(kw => mpLow.includes(kw))) {
-        totalSkor += bobot * 20; // tiap match +20 poin (x bobot)
-      }
-    });
+    // Cukup satu mapel yang cocok sudah cukup untuk bakat ini (hindari double-count)
+    const adaMatch = mapelKelas.some(mp =>
+      keywords.some(kw => mp.toLowerCase().includes(kw))
+    );
+    if (adaMatch) totalSkor += bobot * 20;
   });
-  // Normalisasi ke 0-100
-  const maxMungkin = 6 * mapelKelas.length * 20; // bobot max (3+2+1) x jumlah mapel x 20
+  // maxMungkin = (3+2+1) x 20 = 120, tetap konstan tidak terpengaruh jumlah mapel
+  const maxMungkin = 6 * 20;
   return Math.min(100, Math.round((totalSkor / maxMungkin) * 100));
 }
 
-// autoAssign: gabungkan bidang bakat + kesesuaian mapel, filter per jenjang
+// autoAssign untuk sekolah umum (tanpa penjurusan IPA/IPS).
+// Penentu utama = kesesuaian mapel pilihan kelas dengan bakat siswa.
+//
+// Sistem penempatan ADIL — 3 lapis:
+//   Lapis 1: kelas terbaik masih ada kursi              → masuk langsung
+//   Lapis 2: kelas terbaik penuh, kesesuaian ≥ 70%     → overflow sementara + flag peringatan
+//   Lapis 3: kesesuaian < 70% atau semua opsi penuh    → kelas terbaik berikutnya yang masih kosong
+//
+// Return: { kelasId, overflow, mapelSkor }
+// overflow = true  → panitia perlu meninjau (kelas melebihi kapasitas karena siswa sangat cocok)
+// overflow = false → penempatan normal
+const OVERFLOW_THRESHOLD = 70; // % — ambang kesesuaian mapel untuk boleh overflow
+
 function autoAssign(top, daftar, kelas, jenjangSiswa) {
   const top0 = Array.isArray(top) ? top[0] : top;
-  const bid = top0?.id;
   const topArr = Array.isArray(top) ? top : [top0];
 
-  // Filter kelas sesuai jenjang siswa (jika jenjang tidak cocok, tetap tampilkan semua)
+  // Filter kelas sesuai jenjang siswa
   const kelasFiltred = jenjangSiswa
     ? kelas.filter(k => !k.jenjang || k.jenjang === jenjangSiswa)
     : kelas;
   const kelasCandidates = kelasFiltred.length > 0 ? kelasFiltred : kelas;
 
+  // Hitung skor semua kelas (termasuk yang sudah penuh)
   const withScore = kelasCandidates
     .map(k => {
       const terisi = daftar.filter(s => s.kelasId === k.id).length;
-      const mapelSkor = hitungKesesuaianMapel(topArr, k.mapel || []);
-      // Skor gabungan: bidang cocok (+60), mapel skor (0-40), kurangi kepadatan
-      const bidangCocok = k.bidang === bid ? 60 : 0;
-      const mapelBonus  = mapelSkor !== null ? Math.round(mapelSkor * 0.4) : 0;
-      const padatPenalty = terisi / (k.kapasitas || 1) * 20;
-      const totalSkor   = bidangCocok + mapelBonus - padatPenalty;
-      return { ...k, terisi, totalSkor, mapelSkor };
+      const mapelSkor    = hitungKesesuaianMapel(topArr, k.mapel || []) ?? 0;
+      const padatPenalty = Math.round(terisi / (k.kapasitas || 1) * 20);
+      const totalSkor    = mapelSkor - padatPenalty;
+      const penuh        = terisi >= (k.kapasitas || 0);
+      return { ...k, terisi, totalSkor, mapelSkor, penuh };
     })
-    .filter(k => k.terisi < k.kapasitas)
     .sort((a, b) => b.totalSkor - a.totalSkor);
 
-  return withScore[0]?.id || null;
+  if (withScore.length === 0) return { kelasId: null, overflow: false, mapelSkor: 0 };
+
+  const terbaik = withScore[0];
+
+  // Lapis 1: kelas terbaik masih ada kursi → masuk langsung
+  if (!terbaik.penuh) {
+    return { kelasId: terbaik.id, overflow: false, mapelSkor: terbaik.mapelSkor };
+  }
+
+  // Lapis 2: kelas terbaik penuh tapi kesesuaian sangat tinggi → overflow sementara
+  if (terbaik.mapelSkor >= OVERFLOW_THRESHOLD) {
+    return { kelasId: terbaik.id, overflow: true, mapelSkor: terbaik.mapelSkor };
+  }
+
+  // Lapis 3: cari kelas terbaik berikutnya yang masih ada kursi
+  const alternatif = withScore.find(k => !k.penuh);
+  if (alternatif) {
+    return { kelasId: alternatif.id, overflow: false, mapelSkor: alternatif.mapelSkor };
+  }
+
+  // Semua kelas penuh — overflow ke kelas terbaik (skor tertinggi)
+  return { kelasId: terbaik.id, overflow: true, mapelSkor: terbaik.mapelSkor };
 }
 
 // ══════════════════════════════════════════
@@ -721,15 +752,17 @@ export default function App() {
         daftarLive = sd;
       } catch(e) { console.error("Gagal fetch live data:", e.message); }
     }
-    const kelasId   = autoAssign(top, daftarLive, kelasLive, formSiswa.jenjang || jenjang);
-    const kelasNama = kelasLive.find(k => k.id === kelasId)?.nama || null;
+    const assignResult = autoAssign(top, daftarLive, kelasLive, formSiswa.jenjang || jenjang);
+    const kelasId      = assignResult.kelasId;
+    const kelasNama    = kelasLive.find(k => k.id === kelasId)?.nama || null;
+    const kelasOverflow = assignResult.overflow;   // true = kelas penuh tapi siswa tetap dimasukkan
     const narasi    = generateNarasi(formSiswa.nama, scores, top);
     const gbScores  = calcGayaBelajar(gbAnswers);
     const [topGbId, topGbPct] = getTopGayaBelajar(gbScores);
     const topGbCat  = GAYA_BELAJAR_CAT.find(c => c.id === topGbId);
     const jurusan   = getJurusan(formSiswa.jenjang || jenjang);
     const rec = {
-      ...formSiswa, scores, top, kelasId, kelasNama,
+      ...formSiswa, scores, top, kelasId, kelasNama, kelasOverflow,
       tanggalAsesmen: new Date().toLocaleDateString("id-ID", { dateStyle: "long" }),
       narasi,
       jenjang: formSiswa.jenjang || jenjang,
@@ -900,7 +933,7 @@ export default function App() {
             onSelesai={handleSelesai}
           />
         )}
-        {phase === "result" && viewSiswa && <Hasil siswa={viewSiswa} onBaru={resetAsesmen} onDaftar={()=>setPhase("dashboard","data")} auth={auth} logoSekolah={logoSekolah} tahunAjaran={tahunAjaran}/>}
+        {phase === "result" && viewSiswa && <Hasil siswa={viewSiswa} onBaru={resetAsesmen} onDaftar={()=>setPhase("dashboard","data")} auth={auth} logoSekolah={logoSekolah} tahunAjaran={tahunAjaran} kelasList={kelas}/>}
         {phase === "dashboard" && auth.role==="panitia" && (
           <Dashboard
             daftar={daftar} setDaftar={setDaftar}
@@ -1807,11 +1840,18 @@ function AsesmenGayaBelajar({questions,current,answers,animIn,onAnswer,onNext,on
 // ══════════════════════════════════════════
 // HASIL
 // ══════════════════════════════════════════
-function Hasil({siswa,onBaru,onDaftar,auth,logoSekolah,tahunAjaran}) {
+function Hasil({siswa,onBaru,onDaftar,auth,logoSekolah,tahunAjaran,kelasList}) {
   const top = siswa.top; const t0 = top[0];
   const gb  = siswa.gayaBelajar;
   const jurusan = siswa.jurusan || JURUSAN_PER_JENJANG["sma_x"];
   const jenjangInfo = JENJANG_LIST.find(j => j.id === siswa.jenjang);
+
+  // Hitung skor kesesuaian mapel siswa dengan kelas yang ditetapkan (bukan skor bakat mentah)
+  const kelasObj = (kelasList||[]).find(k => k.id === siswa.kelasId);
+  const kesesuaianMapel = kelasObj
+    ? (hitungKesesuaianMapel(top, kelasObj.mapel || []) ?? 0)
+    : null;
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:18,maxWidth:860,margin:"0 auto"}}>
       <div style={{textAlign:"center",padding:"16px 0"}}>
@@ -1820,15 +1860,44 @@ function Hasil({siswa,onBaru,onDaftar,auth,logoSekolah,tahunAjaran}) {
         <p style={{color:"#475569",fontSize:13,margin:0}}>{siswa.nisn} · {siswa.sekolah} · {siswa.tanggalAsesmen}</p>
       </div>
       {siswa.kelasNama && auth?.role==="panitia" &&(
-        <div style={{background:t0.color+"15",border:"2px solid "+t0.color+"55",borderRadius:16,padding:"16px 22px",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-          <span style={{fontSize:34}}>🏫</span>
-          <div style={{flex:1}}>
-            <div style={{fontSize:11,color:t0.color,fontWeight:700,letterSpacing:1,marginBottom:3}}>KELAS YANG DITETAPKAN</div>
-            <div style={{fontSize:22,fontWeight:900,color:"#E2E8F0"}}>{siswa.kelasNama}</div>
-          </div>
-          <div style={{textAlign:"center"}}>
-            <div style={{fontSize:10,color:"#475569",marginBottom:2}}>KESESUAIAN BAKAT</div>
-            <div style={{fontSize:24,fontWeight:900,color:t0.color}}>{t0.pct}%</div>
+        <div style={{background:siswa.kelasOverflow?"#F59E0B15":t0.color+"15",border:"2px solid "+(siswa.kelasOverflow?"#F59E0B88":t0.color+"55"),borderRadius:16,padding:"16px 22px",display:"flex",flexDirection:"column",gap:10}}>
+          {siswa.kelasOverflow&&(
+            <div style={{display:"flex",alignItems:"center",gap:8,background:"#F59E0B22",border:"1px solid #F59E0B66",borderRadius:10,padding:"8px 12px"}}>
+              <span style={{fontSize:18}}>⚠️</span>
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:"#D97706",marginBottom:2}}>KELAS MELEBIHI KAPASITAS — PERLU DITINJAU</div>
+                <div style={{fontSize:11,color:"#92400E",lineHeight:1.5}}>
+                  Siswa ini ditempatkan di kelas penuh karena kesesuaian mapelnya sangat tinggi ({kesesuaianMapel}%).
+                  Panitia dapat memindahkan siswa ke kelas lain atau menambah kapasitas kelas ini.
+                </div>
+              </div>
+            </div>
+          )}
+          <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+            <span style={{fontSize:34}}>🏫</span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:11,color:siswa.kelasOverflow?"#D97706":t0.color,fontWeight:700,letterSpacing:1,marginBottom:3}}>
+                KELAS YANG DITETAPKAN{siswa.kelasOverflow?" (OVERFLOW)":""}
+              </div>
+              <div style={{fontSize:22,fontWeight:900,color:"#E2E8F0"}}>{siswa.kelasNama}</div>
+              {kelasObj?.mapel?.length>0&&(
+                <div style={{marginTop:6,display:"flex",flexWrap:"wrap",gap:4}}>
+                  {kelasObj.mapel.map(mp=>(
+                    <span key={mp} style={{fontSize:10,background:t0.color+"22",color:t0.color,borderRadius:20,padding:"2px 8px",fontWeight:600}}>{mp}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:10,color:"#475569",marginBottom:2}}>KESESUAIAN MAPEL</div>
+              {kesesuaianMapel !== null
+                ? <div style={{fontSize:24,fontWeight:900,color:siswa.kelasOverflow?"#F59E0B":t0.color}}>{kesesuaianMapel}%</div>
+                : <div style={{fontSize:13,color:"#475569"}}>—</div>
+              }
+              {kesesuaianMapel !== null && kelasObj?.mapel?.length===0&&(
+                <div style={{fontSize:10,color:"#F59E0B",marginTop:2}}>mapel belum diisi</div>
+              )}
+            </div>
           </div>
         </div>
       )}
