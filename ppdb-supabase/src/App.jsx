@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
-// ──────────────────────────────────────────
+// ------------------------------------------
 // RESPONSIVE HOOK
-// ──────────────────────────────────────────
+// ------------------------------------------
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
   useEffect(() => {
@@ -14,9 +14,9 @@ function useIsMobile() {
   return isMobile;
 }
 
-// ──────────────────────────────────────────
+// ------------------------------------------
 // URL ROUTING (tanpa library tambahan)
-// ──────────────────────────────────────────
+// ------------------------------------------
 // Peta phase+tab → path URL
 const PHASE_TO_PATH = {
   "landing":          "/",
@@ -81,9 +81,9 @@ import {
 import LoginPage from "./LoginPage";
 import OwnerDashboard from "./OwnerDashboard";
 
-// ══════════════════════════════════════════
+// ==========================================
 // KONSTANTA
-// ══════════════════════════════════════════
+// ==========================================
 const DEFAULT_TARGET = { min: 120, max: 175 };
 const DEFAULT_KELAS = [
   { id:"k1", nama:"X-A", bidang:"sains",    kapasitas:35, wali:"", jenjang:"sma_x" },
@@ -101,9 +101,9 @@ const CAT = [
   { id:"olahraga", label:"Olahraga & Kinestetik",  icon:"⚽", color:"#06B6D4" },
 ];
 
-// ══════════════════════════════════════════
+// ==========================================
 // JENJANG
-// ══════════════════════════════════════════
+// ==========================================
 const JENJANG_LIST = [
   { id: "smp",    label: "SMP / MTs",           icon: "🏫", subtitle: "Penjurusan kelas VII" },
   { id: "sma_x",  label: "SMA / SMK — Kelas X", icon: "🎓", subtitle: "PPDB siswa baru" },
@@ -143,9 +143,9 @@ function getJurusan(jenjang) {
   return JURUSAN_PER_JENJANG[jenjang] || JURUSAN_PER_JENJANG["sma_x"];
 }
 
-// ══════════════════════════════════════════
+// ==========================================
 // GAYA BELAJAR
-// ══════════════════════════════════════════
+// ==========================================
 const GAYA_BELAJAR_CAT = [
   { id: "visual",     label: "Visual",      icon: "👁️",  color: "#3B82F6", desc: "Belajar lewat gambar, grafik, warna & diagram" },
   { id: "auditori",   label: "Auditori",    icon: "👂",  color: "#10B981", desc: "Belajar lewat mendengar, diskusi & ceramah" },
@@ -276,9 +276,9 @@ const SCALE = [
   {val:5,label:"Sangat Setuju"},
 ];
 
-// ══════════════════════════════════════════
+// ==========================================
 // UTILS
-// ══════════════════════════════════════════
+// ==========================================
 function calcScores(ans) {
   const scores = {}; const counts = {};
   CAT.forEach(c => { scores[c.id]=0; counts[c.id]=0; });
@@ -384,9 +384,9 @@ function autoAssign(top, daftar, kelas, jenjangSiswa) {
   return { kelasId: terbaik.id, overflow: true, mapelSkor: terbaik.mapelSkor };
 }
 
-// ══════════════════════════════════════════
+// ==========================================
 // BULK ASSIGN — ranking semua siswa sekaligus
-// ══════════════════════════════════════════
+// ==========================================
 // Dipanggil admin setelah semua siswa selesai asesmen.
 // Proses: urutkan siswa per jenjang berdasarkan skor kesesuaian mapel (tertinggi duluan),
 // lalu tempatkan satu per satu ke kelas terbaik yang masih ada kursi.
@@ -441,9 +441,9 @@ function bulkAssign(daftar, kelas) {
   return hasil;
 }
 
-// ══════════════════════════════════════════
+// ==========================================
 // GENERATOR NARASI
-// ══════════════════════════════════════════
+// ==========================================
 const NARASI_DB = {
   p1: {
     logika: {
@@ -776,9 +776,9 @@ function doExcelExportPerKelas(daftar, kelas) {
       </div>
     </div>
   </div>
-// ══════════════════════════════════════════
+// ==========================================
 // APP ROOT
-// ══════════════════════════════════════════
+// ==========================================
 export default function App() {
   // Baca initial state dari URL saat pertama load
   const initFromUrl = () => {
@@ -833,7 +833,7 @@ export default function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  // ── Load data dari Supabase — semua query pakai auth.school_id ──
+  // -- Load data dari Supabase — semua query pakai auth.school_id --
   const loadAllData = useCallback(async () => {
     if (!auth?.school_id) return;
     setDbLoading(true); setDbError(null);
@@ -882,10 +882,10 @@ export default function App() {
   }
 
   async function handleSelesai() {
-    // ── Validasi kuota paket ──────────────────────────────
+    // -- Validasi kuota paket ------------------------------
     const maksSiswa = auth?.maksSiswa ?? null;
     if (maksSiswa !== null && daftar.length >= maksSiswa) {
-      alert(`Kuota siswa paket Anda sudah penuh (${maksSiswa} siswa).\nHubungi admin untuk upgrade paket.`);
+      alert("Kuota siswa paket Anda sudah penuh (" + maksSiswa + " siswa).\nHubungi admin untuk upgrade paket.");
       return;
     }
     const scores    = calcScores(answers);
@@ -956,7 +956,7 @@ export default function App() {
         const h = hasilAssign.find(x => x.siswaId === s.id);
         return h ? { ...s, kelasId: h.kelasId, kelasNama: h.kelasNama } : s;
       }));
-      alert(`Penempatan selesai! ${hasilAssign.length} siswa berhasil ditempatkan.`);
+      alert("Penempatan selesai! " + hasilAssign.length + " siswa berhasil ditempatkan.");
     } catch(e) {
       alert("Gagal memproses penempatan: " + e.message);
     } finally {
@@ -1116,7 +1116,7 @@ export default function App() {
             onBaru={()=>{
               const maks = auth?.maksSiswa ?? null;
               if (maks !== null && daftar.length >= maks) {
-                alert(`Kuota siswa penuh (${maks} siswa).\nHubungi admin untuk upgrade paket.`);
+                alert("Kuota siswa penuh (" + maks + " siswa).\nHubungi admin untuk upgrade paket.");
                 return;
               }
               setPhase("landing");
@@ -1140,9 +1140,9 @@ export default function App() {
   );
 }
 
-// ══════════════════════════════════════════
+// ==========================================
 // LOGIN
-// ══════════════════════════════════════════
+// ==========================================
 function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab,questions}) {
   const [copied, setCopied] = useState(false);
   function copyKode() {
@@ -1205,9 +1205,9 @@ function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab,questions}) {
   );
 }
 
-// ══════════════════════════════════════════
+// ==========================================
 // SETUP WIZARD
-// ══════════════════════════════════════════
+// ==========================================
 function SetupWizard({kelas,target,jenjang,maksSiswa,onSaveKelas,onSaveTarget,onSaveJenjang,onDone,dbLoading}) {
   const [step,setStep]=useState(0);
   const [lj,setLj]=useState(jenjang||"sma_x");
@@ -1260,7 +1260,7 @@ function SetupWizard({kelas,target,jenjang,maksSiswa,onSaveKelas,onSaveTarget,on
   }
   function addK(){
     if(maksSiswa !== null && totalKap >= maksSiswa) {
-      alert(`Total kapasitas kelas sudah mencapai batas paket (${maksSiswa} siswa).`);
+      alert("Total kapasitas kelas sudah mencapai batas paket (" + maksSiswa + " siswa).");
       return;
     }
     setLk(prev=>[...prev,{id:"k"+Date.now(),nama:"",bidang:"sains",kapasitas:Math.min(30, maksSiswa?maksSiswa-totalKap:30),wali:"",jenjang:lj}]);
@@ -1275,7 +1275,7 @@ function SetupWizard({kelas,target,jenjang,maksSiswa,onSaveKelas,onSaveTarget,on
   }
 
   async function finish() {
-    if (kapMelebihi) { alert(`Total kapasitas kelas (${totalKap}) melebihi kuota paket (${maksSiswa} siswa). Kurangi kapasitas atau jumlah kelas.`); return; }
+    if (kapMelebihi) { alert("Total kapasitas kelas (" + totalKap + ") melebihi kuota paket (" + maksSiswa + " siswa). Kurangi kapasitas atau jumlah kelas."); return; }
     const global = calcGlobal();
     await onSaveKelas(lk);
     await onSaveTarget(global.min, global.max, lt.perJenjang);
@@ -1438,9 +1438,9 @@ function SetupWizard({kelas,target,jenjang,maksSiswa,onSaveKelas,onSaveTarget,on
   );
 }
 
-// ══════════════════════════════════════════
+// ==========================================
 // LANDING
-// ══════════════════════════════════════════
+// ==========================================
 function Landing({onMulai}) {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:26}}>
@@ -1465,12 +1465,12 @@ function Landing({onMulai}) {
   );
 }
 
-// ══════════════════════════════════════════
+// ==========================================
 // FORM SISWA
-// ══════════════════════════════════════════
-// ══════════════════════════════════════════
+// ==========================================
+// ==========================================
 // INPUT KODE SEKOLAH (siswa mandiri)
-// ══════════════════════════════════════════
+// ==========================================
 function InputKodeSekolah({onValid, onBatal}) {
   const [kode, setKode]     = useState("");
   const [loading, setLoading] = useState(false);
@@ -1531,9 +1531,9 @@ function InputKodeSekolah({onValid, onBatal}) {
   );
 }
 
-// ══════════════════════════════════════════
+// ==========================================
 // FORM SISWA
-// ══════════════════════════════════════════
+// ==========================================
 function FormSiswa({siswa,onChange,onLanjut,siswaSchool,jenjangAdmin}) {
   const valid = siswa.nama && siswa.nisn && siswa.sekolah && siswa.jenjang;
   return (
@@ -1588,9 +1588,9 @@ function FormSiswa({siswa,onChange,onLanjut,siswaSchool,jenjangAdmin}) {
   );
 }
 
-// ══════════════════════════════════════════
+// ==========================================
 // ASESMEN
-// ══════════════════════════════════════════
+// ==========================================
 function Asesmen({questions,current,answers,animIn,onAnswer,onNext,onPrev,onSelesai}) {
   const q = questions[current];
   const cat = CAT.find(c=>c.id===q.cat);
@@ -1658,11 +1658,11 @@ function Asesmen({questions,current,answers,animIn,onAnswer,onNext,onPrev,onSele
 }
 
 
-// ══════════════════════════════════════════
+// ==========================================
 // KELOLA ADMIN
-// ══════════════════════════════════════════
+// ==========================================
 // PENGATURAN LOGO SEKOLAH
-// ══════════════════════════════════════════
+// ==========================================
 function PengaturanLogo({ auth, logoSekolah, onSaveLogo, tahunAjaran, onSaveTahun }) {
   const [preview, setPreview] = useState(logoSekolah || null);
   const [saving, setSaving] = useState(false);
@@ -1727,7 +1727,7 @@ function PengaturanLogo({ auth, logoSekolah, onSaveLogo, tahunAjaran, onSaveTahu
     <div style={{maxWidth:560,display:"flex",flexDirection:"column",gap:20}}>
       <h2 style={S.cardTitle}>🏫 Identitas Sekolah</h2>
 
-      {/* ── Tahun Ajaran ── */}
+      {/* -- Tahun Ajaran -- */}
       <div style={{background:"#0F172A",border:"1px solid #1E293B",borderRadius:14,padding:20}}>
         <div style={{fontWeight:700,fontSize:14,color:"#E2E8F0",marginBottom:4}}>📅 Tahun Ajaran PPDB</div>
         <div style={{fontSize:12,color:"#475569",marginBottom:14}}>Muncul di kop surat hasil cetak asesmen siswa.</div>
@@ -1753,7 +1753,7 @@ function PengaturanLogo({ auth, logoSekolah, onSaveLogo, tahunAjaran, onSaveTahu
         )}
       </div>
 
-      {/* ── Logo Sekolah ── */}
+      {/* -- Logo Sekolah -- */}
       <div style={{background:"#0F172A",border:"1px solid #1E293B",borderRadius:14,padding:20}}>
         <div style={{fontWeight:700,fontSize:14,color:"#E2E8F0",marginBottom:4}}>🖼️ Logo Sekolah</div>
         <div style={{fontSize:12,color:"#475569",marginBottom:14}}>Format: JPG/PNG/WebP · Maks 500KB · Disarankan persegi (1:1).</div>
@@ -1791,7 +1791,7 @@ function PengaturanLogo({ auth, logoSekolah, onSaveLogo, tahunAjaran, onSaveTahu
 }
 
 
-// ══════════════════════════════════════════
+// ==========================================
 function KelolAdmin({ auth }) {
   const [adminList, setAdminList] = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -1820,7 +1820,7 @@ function KelolAdmin({ auth }) {
   async function handleTambah() {
     if (!form.username || !form.password || !form.nama) { setMsg("❌ Nama, username & password wajib diisi."); return; }
     if (form.password.length < 6) { setMsg("❌ Password minimal 6 karakter."); return; }
-    if (maksAdmin !== null && kuota >= maksAdmin) { setMsg(`Paket ${paket} hanya bisa tambah ${maksAdmin} admin.`); return; }
+    if (maksAdmin !== null && kuota >= maksAdmin) { setMsg("Paket " + paket + " hanya bisa tambah " + maksAdmin + " admin."); return; }
     setLoading(true); setMsg("");
     try {
       const res = await tambahAdmin({
@@ -1935,9 +1935,9 @@ function KelolAdmin({ auth }) {
   );
 }
 
-// ══════════════════════════════════════════
+// ==========================================
 // ASESMEN GAYA BELAJAR
-// ══════════════════════════════════════════
+// ==========================================
 function AsesmenGayaBelajar({questions,current,answers,animIn,onAnswer,onNext,onPrev,onSelesai}) {
   const q = questions[current];
   const cat = GAYA_BELAJAR_CAT.find(c=>c.id===q.cat);
@@ -2008,9 +2008,9 @@ function AsesmenGayaBelajar({questions,current,answers,animIn,onAnswer,onNext,on
   );
 }
 
-// ══════════════════════════════════════════
+// ==========================================
 // HASIL
-// ══════════════════════════════════════════
+// ==========================================
 function Hasil({siswa,onBaru,onDaftar,auth,logoSekolah,tahunAjaran,kelasList}) {
   const top = siswa.top; const t0 = top[0];
   const gb  = siswa.gayaBelajar;
@@ -2158,12 +2158,12 @@ function Hasil({siswa,onBaru,onDaftar,auth,logoSekolah,tahunAjaran,kelasList}) {
   );
 }
 
-// ══════════════════════════════════════════
+// ==========================================
 // DASHBOARD
-// ══════════════════════════════════════════
-// ══════════════════════════════════════════
+// ==========================================
+// ==========================================
 // KODE BANNER (tampil di dashboard sekolah)
-// ══════════════════════════════════════════
+// ==========================================
 function KodeBanner({kode, namaSekolah}) {
   const [copied, setCopied] = useState(false);
   function copy() {
@@ -2190,9 +2190,9 @@ function KodeBanner({kode, namaSekolah}) {
   );
 }
 
-// ══════════════════════════════════════════
+// ==========================================
 // DASHBOARD
-// ══════════════════════════════════════════
+// ==========================================
 function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,maksSiswa,onDetail,onBaru,onExport,onSetupUlang,onSaveKelas,onDeleteKelas,onUpdateKelasSiswa,onRefresh,onBulkAssign,dbLoading,logoSekolah,onSaveLogo,tahunAjaran,onSaveTahun}) {
   const isUtama = auth?.role_admin === "admin_utama";
   if(tab==="data")  return <DaftarSiswa daftar={daftar} kelas={kelas} onDetail={onDetail} onBaru={onBaru} onExport={onExport} onUpdateKelasSiswa={onUpdateKelasSiswa} isUtama={isUtama} logoSekolah={logoSekolah} tahunAjaran={tahunAjaran} auth={auth} maksSiswa={maksSiswa}/>;
@@ -2208,7 +2208,7 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,maks
   if(tab==="admin" && isUtama) return <KelolAdmin auth={auth}/>;
   if(tab==="logo"  && isUtama) return <PengaturanLogo auth={auth} logoSekolah={logoSekolah} onSaveLogo={onSaveLogo} tahunAjaran={tahunAjaran} onSaveTahun={onSaveTahun}/>;
 
-  // ── Kuota siswa ──
+  // -- Kuota siswa --
   const kuotaPenuh  = maksSiswa !== null && daftar.length >= maksSiswa;
   const kuotaHampir = maksSiswa !== null && !kuotaPenuh && daftar.length >= Math.floor(maksSiswa * 0.9);
   const sisaKuota   = maksSiswa !== null ? maksSiswa - daftar.length : null;
@@ -2236,7 +2236,7 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,maks
         <KodeBanner kode={auth.kodeSekolah} namaSekolah={auth.namaSekolah} />
       )}
 
-      {/* ── Banner kuota paket ── */}
+      {/* -- Banner kuota paket -- */}
       {kuotaPenuh && (
         <div style={{background:"#450A0A",border:"1px solid #EF444466",borderRadius:12,padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -2288,7 +2288,7 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,maks
         </div>
       </div>
 
-      {/* ── Progress total ── */}
+      {/* -- Progress total -- */}
       <div style={{background:"#0F172A",border:"1px solid #1E3A5F",borderRadius:14,padding:18}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:8}}>
           <div>
@@ -2307,7 +2307,7 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,maks
         </div>
       </div>
 
-      {/* ── Progress per jenjang ── */}
+      {/* -- Progress per jenjang -- */}
       {statsPerJenjang.length > 0 && (
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           <div style={{fontSize:14,fontWeight:700,color:"#94A3B8"}}>📊 Progress Per Jenjang</div>
@@ -2469,12 +2469,12 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,maks
   );
 }
 
-// ══════════════════════════════════════════
+// ==========================================
 // MANAJEMEN KELAS
-// ══════════════════════════════════════════
+// ==========================================
 
 // Komponen input mata pelajaran per kelas
-// ── Daftar mapel pilihan sekolah (sesuai konfigurasi kelas XI) ──
+// -- Daftar mapel pilihan sekolah (sesuai konfigurasi kelas XI) --
 const MAPEL_OPTIONS = [
   { id: "mat_lanjut",  label: "Matematika Lanjut" },
   { id: "matematika",  label: "Matematika" },
@@ -2711,7 +2711,7 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
         </div>
       )}
 
-      {/* ── Kelas dikelompokkan per jenjang ── */}
+      {/* -- Kelas dikelompokkan per jenjang -- */}
       {JENJANG_LIST.map(j => {
         const kelasList = kelasByJenjang[j.id] || [];
         const kapJenjang = kelasList.reduce((s,k)=>s+k.kapasitas,0);
@@ -2809,9 +2809,9 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
   );
 }
 
-// ══════════════════════════════════════════
+// ==========================================
 // DAFTAR SISWA
-// ══════════════════════════════════════════
+// ==========================================
 function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,isUtama,logoSekolah,tahunAjaran,auth,maksSiswa}) {
   const kuotaPenuh = maksSiswa !== null && daftar.length >= maksSiswa;
   const [search,setSearch]=useState("");
@@ -2916,9 +2916,9 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,i
   );
 }
 
-// ══════════════════════════════════════════
+// ==========================================
 // MANAJEMEN SOAL
-// ══════════════════════════════════════════
+// ==========================================
 function ManajemenSoal({ soal, onAdd, onUpdate, onDelete }) {
   const [fCat, setFCat] = useState("all");
   const [editId, setEditId] = useState(null);
@@ -3002,9 +3002,9 @@ function ManajemenSoal({ soal, onAdd, onUpdate, onDelete }) {
   );
 }
 
-// ══════════════════════════════════════════
+// ==========================================
 // STYLES
-// ══════════════════════════════════════════
+// ==========================================
 const S = {
   root:       {minHeight:"100vh",background:"#080E1A",color:"#E2E8F0",fontFamily:"'DM Sans','Segoe UI',sans-serif"},
   header:     {background:"#0B1120",borderBottom:"1px solid #1A2744",position:"sticky",top:0,zIndex:100},
@@ -3035,7 +3035,7 @@ _s.textContent=`
 @keyframes spin{to{transform:rotate(360deg)}}
 input:focus,select:focus{border-color:#3B82F6!important}
 
-/* ── RESPONSIVE BASE ── */
+/* -- RESPONSIVE BASE -- */
 *{box-sizing:border-box}
 
 /* Table scroll wrapper */
