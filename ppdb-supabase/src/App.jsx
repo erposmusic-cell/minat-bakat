@@ -885,7 +885,7 @@ export default function App() {
     // ── Validasi kuota paket ──────────────────────────────
     const maksSiswa = auth?.maksSiswa ?? null;
     if (maksSiswa !== null && daftar.length >= maksSiswa) {
-      alert(`❌ Kuota siswa paket Anda sudah penuh (${maksSiswa} siswa).\nHubungi admin untuk upgrade paket.`);
+      alert(`Kuota siswa paket Anda sudah penuh (${maksSiswa} siswa).\nHubungi admin untuk upgrade paket.`);
       return;
     }
     const scores    = calcScores(answers);
@@ -937,7 +937,7 @@ export default function App() {
       if (e.message?.startsWith("KUOTA_PENUH:")) {
         const msg = e.message.replace("KUOTA_PENUH:", "");
         // Tetap tampilkan hasil asesmen, tapi beri tahu kuota penuh
-        setTimeout(() => alert("⚠️ Data asesmen tidak tersimpan!\n\n" + msg), 300);
+        setTimeout(() => alert("Data asesmen tidak tersimpan!\n\n" + msg), 300);
       } else {
         console.error("Gagal simpan ke Supabase:", e.message);
       }
@@ -956,9 +956,9 @@ export default function App() {
         const h = hasilAssign.find(x => x.siswaId === s.id);
         return h ? { ...s, kelasId: h.kelasId, kelasNama: h.kelasNama } : s;
       }));
-      alert(`✅ Penempatan selesai!\n${hasilAssign.length} siswa berhasil ditempatkan.`);
+      alert(`Penempatan selesai! ${hasilAssign.length} siswa berhasil ditempatkan.`);
     } catch(e) {
-      alert("❌ Gagal memproses penempatan: " + e.message);
+      alert("Gagal memproses penempatan: " + e.message);
     } finally {
       setDbLoading(false);
     }
@@ -1116,7 +1116,7 @@ export default function App() {
             onBaru={()=>{
               const maks = auth?.maksSiswa ?? null;
               if (maks !== null && daftar.length >= maks) {
-                alert(`❌ Kuota siswa penuh (${maks} siswa).\nHubungi admin untuk upgrade paket.`);
+                alert(`Kuota siswa penuh (${maks} siswa).\nHubungi admin untuk upgrade paket.`);
                 return;
               }
               setPhase("landing");
@@ -1260,7 +1260,7 @@ function SetupWizard({kelas,target,jenjang,maksSiswa,onSaveKelas,onSaveTarget,on
   }
   function addK(){
     if(maksSiswa !== null && totalKap >= maksSiswa) {
-      alert(`❌ Total kapasitas kelas sudah mencapai batas paket (${maksSiswa} siswa).`);
+      alert(`Total kapasitas kelas sudah mencapai batas paket (${maksSiswa} siswa).`);
       return;
     }
     setLk(prev=>[...prev,{id:"k"+Date.now(),nama:"",bidang:"sains",kapasitas:Math.min(30, maksSiswa?maksSiswa-totalKap:30),wali:"",jenjang:lj}]);
@@ -1275,7 +1275,7 @@ function SetupWizard({kelas,target,jenjang,maksSiswa,onSaveKelas,onSaveTarget,on
   }
 
   async function finish() {
-    if (kapMelebihi) { alert(`❌ Total kapasitas kelas (${totalKap}) melebihi kuota paket (${maksSiswa} siswa). Kurangi kapasitas atau jumlah kelas.`); return; }
+    if (kapMelebihi) { alert(`Total kapasitas kelas (${totalKap}) melebihi kuota paket (${maksSiswa} siswa). Kurangi kapasitas atau jumlah kelas.`); return; }
     const global = calcGlobal();
     await onSaveKelas(lk);
     await onSaveTarget(global.min, global.max, lt.perJenjang);
@@ -1820,7 +1820,7 @@ function KelolAdmin({ auth }) {
   async function handleTambah() {
     if (!form.username || !form.password || !form.nama) { setMsg("❌ Nama, username & password wajib diisi."); return; }
     if (form.password.length < 6) { setMsg("❌ Password minimal 6 karakter."); return; }
-    if (maksAdmin !== null && kuota >= maksAdmin) { setMsg(`❌ Paket ${paket} hanya bisa tambah ${maksAdmin} admin.`); return; }
+    if (maksAdmin !== null && kuota >= maksAdmin) { setMsg(`Paket ${paket} hanya bisa tambah ${maksAdmin} admin.`); return; }
     setLoading(true); setMsg("");
     try {
       const res = await tambahAdmin({
