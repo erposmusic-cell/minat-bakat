@@ -392,7 +392,6 @@ function autoAssign(top, daftar, kelas, jenjangSiswa) {
 // lalu tempatkan satu per satu ke kelas terbaik yang masih ada kursi.
 // Return: array { siswaId, kelasId, kelasNama } untuk semua siswa yang berhasil ditempatkan.
 function bulkAssign(daftar, kelas) {
-  // Pisahkan per jenjang
   const jenjangList = [...new Set(daftar.map(s => s.jenjang || "sma_x"))];
   const hasil = [];
 
@@ -401,56 +400,40 @@ function bulkAssign(daftar, kelas) {
     const kelasDijenjang = kelas.filter(k => !k.jenjang || k.jenjang === jenjang);
     if (kelasDijenjang.length === 0) return;
 
-    // Hitung skor kesesuaian tiap siswa terhadap tiap kelas
+    // Kelas XI pakai kesesuaian mapel; Kelas X & SMP pakai kecocokan bidang kelas
+    const pakaiMapel = jenjang === "sma_xi";
+
     const siswaScored = siswaDijenjang.map(s => {
       const topArr = Array.isArray(s.top) ? s.top : [s.top];
-      const skorPerKelas = kelasDijenjang.map(k => ({
-        kelasId: k.id,
-        kelasNama: k.nama,
-        kapasitas: k.kapasitas || 0,
-        skor: hitungKesesuaianMapel(topArr, k.mapel || []) ?? 0,
-      }));
-      // Urutkan kelas terbaik untuk siswa ini
+      const skorPerKelas = kelasDijenjang.map(k => {
+        let skor = 0;
+        if (pakaiMapel) {
+          skor = hitungKesesuaianMapel(topArr, k.mapel || []) ?? 0;
+        } else {
+          // Kelas X & SMP: pakai nilai persen bakat asli siswa untuk bidang kelas
+          // sehingga ranking antar siswa benar-benar mencerminkan siapa lebih berbakat
+          skor = s.scores?.[k.bidang] ?? 0;
+        }
+        return { kelasId: k.id, kelasNama: k.nama, kapasitas: k.kapasitas || 0, skor };
+      });
       skorPerKelas.sort((a, b) => b.skor - a.skor);
       return { ...s, skorPerKelas };
     });
 
-    // Ranking siswa berdasarkan skor tertinggi ke kelas #1 pilihan mereka
-    // Primary  : skor kesesuaian mapel (bakat vs mapel kelas terbaik)
-    // Tiebreaker: skor bakat murni siswa (top[0].pct) — siswa dengan nilai asesmen lebih tinggi diprioritaskan
-    siswaScored.sort((a, b) => {
-      const skorA = a.skorPerKelas[0]?.skor ?? 0;
-      const skorB = b.skorPerKelas[0]?.skor ?? 0;
-      if (skorB !== skorA) return skorB - skorA;
-      // Tiebreaker: skor bakat murni dari asesmen
-      return (b.top?.[0]?.pct ?? 0) - (a.top?.[0]?.pct ?? 0);
-    });
+    // Ranking siswa dari skor tertinggi
+    siswaScored.sort((a, b) => (b.skorPerKelas[0]?.skor ?? 0) - (a.skorPerKelas[0]?.skor ?? 0));
 
-    // Simulasi kursi tersedia (track terisi secara lokal)
     const terisiMap = {};
     kelasDijenjang.forEach(k => { terisiMap[k.id] = 0; });
 
-    // Siswa yang sudah punya kelas (manual/sebelumnya) — hitung dulu
-    daftar.forEach(s => {
-      if (s.kelasId && terisiMap[s.kelasId] !== undefined) terisiMap[s.kelasId]++;
-    });
-
-    // Reset — bulk assign hanya untuk siswa jenjang ini, mulai fresh
-    kelasDijenjang.forEach(k => { terisiMap[k.id] = 0; });
-
-    // Tempatkan siswa satu per satu dari ranking tertinggi
     siswaScored.forEach(s => {
-      // Cari kelas terbaik yang masih ada kursi
       const pilihan = s.skorPerKelas.find(kx => terisiMap[kx.kelasId] < kx.kapasitas);
       if (pilihan) {
         terisiMap[pilihan.kelasId]++;
         hasil.push({ siswaId: s.id, kelasId: pilihan.kelasId, kelasNama: pilihan.kelasNama });
       } else {
-        // Semua kelas penuh — masuk kelas dengan skor tertinggi (overflow)
         const fallback = s.skorPerKelas[0];
-        if (fallback) {
-          hasil.push({ siswaId: s.id, kelasId: fallback.kelasId, kelasNama: fallback.kelasNama });
-        }
+        if (fallback) hasil.push({ siswaId: s.id, kelasId: fallback.kelasId, kelasNama: fallback.kelasNama });
       }
     });
   });
@@ -701,6 +684,98 @@ function doPrintSiswa(siswa, logoBase64, namaSekolah, tahunAjaran, showKelas = f
   setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
+// Export per kelas tertentu
+function doExcelExportPerKelas(daftar, kelas) {
+  const wb = XLSX.utils.book_new();
+  kelas.forEach(k => {
+    const siswaKelas = daftar.filter(s => s.kelasId === k.id);
+    if (siswaKelas.length === 0) return;
+    const rows = siswaKelas.map((s, i) => {
+      const jur = s.jurusan || JURUSAN_PER_JENJANG["sma_x"];
+      return {
+        "No": i + 1,
+        "Nama": s.nama,
+        "NISN": s.nisn || "-",
+        "Sekolah Asal": s.sekolah || "-",
+        "Tgl Lahir": s.tgl || "-",
+        "Tgl Asesmen": s.tanggalAsesmen || "-",
+        "Bakat Utama": s.top[0]?.label || "-",
+        "Skor (%)": s.top[0]?.pct || 0,
+        "Logika": s.scores.logika,
+        "Bahasa": s.scores.bahasa,
+        "Sains": s.scores.sains,
+        "Seni": s.scores.seni,
+        "Sosial": s.scores.sosial,
+        "Olahraga": s.scores.olahraga,
+        "Gaya Belajar": s.gayaBelajar?.label || "-",
+        "Rekomendasi 1": jur[s.top[0]?.id]?.[0] || "-",
+        "Rekomendasi 2": jur[s.top[0]?.id]?.[1] || "-",
+        "Rekomendasi 3": jur[s.top[0]?.id]?.[2] || "-",
+      };
+    });
+    // Nama sheet maks 31 karakter (batasan Excel)
+    const sheetName = k.nama.slice(0, 31);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
+  });
+  if (wb.SheetNames.length === 0) { alert("Belum ada siswa yang ditempatkan."); return; }
+  XLSX.writeFile(wb, "Data_Per_Kelas_" + new Date().toLocaleDateString("id-ID").replace(/\//g, "-") + ".xlsx");
+}
+  const t0 = siswa.top[0];
+  const bars = CAT.map(c=>`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <span style="min-width:180px;font-size:13px">${c.icon} ${c.label}</span>
+      <div style="flex:1;height:10px;background:#e2e8f0;border-radius:99px">
+        <div style="width:${siswa.scores[c.id]}%;height:100%;background:${c.color};border-radius:99px"></div>
+      </div>
+      <strong style="min-width:36px;color:${c.color}">${siswa.scores[c.id]}%</strong>
+    </div>`).join("");
+  const narasiText = siswa.narasi || "Analisis belum tersedia.";
+  const narasiHtml = narasiText.split("\n\n").map(p=>`<p style="margin:0 0 14px;line-height:1.85;font-size:13.5px">${p}</p>`).join("");
+  const gb = siswa.gayaBelajar;
+  const gbHtml = gb ? `
+    <h2 style="border-left:4px solid ${gb.color};padding-left:10px;margin:20px 0 10px;font-size:15px">
+      ${gb.icon} Gaya Belajar Dominan — ${gb.label} (${gb.pct}%)
+    </h2>
+    <div style="background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="font-size:13px;color:#64748b;margin-bottom:8px">${GAYA_BELAJAR_CAT.find(c=>c.id===gb.dominan)?.desc||""}</div>
+      <strong style="font-size:13px">Tips Belajar:</strong>
+      <ol style="margin:8px 0 0;padding-left:18px">
+        ${(gb.tips||[]).map(t=>`<li style="font-size:13px;margin-bottom:4px;line-height:1.6">${t}</li>`).join("")}
+      </ol>
+    </div>` : "";
+  const jenjangInfo = JENJANG_LIST.find(j=>j.id===siswa.jenjang);
+  const jurusan = (siswa.jurusan || JURUSAN_PER_JENJANG["sma_x"])[t0.id] || [];
+  const topCards = siswa.top.map((t,i)=>`
+    <div style="border-radius:12px;padding:16px;text-align:center;border:2px solid ${t.color};background:${t.color}15">
+      <div style="font-size:11px;color:#94a3b8;font-weight:800">#${i+1}</div>
+      <div style="font-size:26px">${t.icon}</div>
+      <div style="font-size:12px;font-weight:700;color:${t.color}">${t.label}</div>
+      <div style="font-size:24px;font-weight:900;color:${t.color}">${t.pct}%</div>
+    </div>`).join("");
+  const html = `<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><title>Laporan — ${siswa.nama}</title>
+  <style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;max-width:780px;margin:0 auto;padding:32px;color:#1e293b}h2{border-left:4px solid #3b82f6;padding-left:10px;margin:20px 0 10px;font-size:15px}.narasi{background:#f8fafc;border-radius:10px;padding:16px}.footer{margin-top:32px;text-align:center;color:#94a3b8;font-size:12px;border-top:1px solid #e2e8f0;padding-top:12px}</style>
+  </head><body>
+  <div style="border-bottom:3px solid #3b82f6;padding-bottom:16px;margin-bottom:20px">
+    <!-- baris 1: kop sekolah di tengah -->
+    <div style="text-align:center;margin-bottom:14px">
+      ${logoBase64 ? `<img src="${logoBase64}" style="width:72px;height:72px;object-fit:contain;display:block;margin:0 auto 6px" />` : ""}
+      ${namaSekolah ? `<div style="font-size:16px;font-weight:900;color:#1e3a5f;letter-spacing:0.5px;line-height:1.3">${namaSekolah}</div>` : ""}
+      <div style="font-size:12px;color:#64748b;margin-top:2px">Laporan Asesmen Bakat &amp; Minat · PPDB ${tahunAjaran || "2025/2026"}</div>
+    </div>
+    <!-- garis pemisah tipis antara kop dan data peserta -->
+    <div style="border-top:1px dashed #cbd5e1;margin-bottom:12px"></div>
+    <!-- baris 2: data peserta di kiri -->
+    <div>
+      <div style="font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px">Data Peserta</div>
+      <div style="font-size:20px;font-weight:900;color:#1e293b;margin-bottom:4px">${siswa.nama}</div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        <span style="font-size:12px;color:#64748b">NISN: <strong style="color:#334155">${siswa.nisn}</strong></span>
+        <span style="font-size:12px;color:#64748b">Asal: <strong style="color:#334155">${siswa.sekolah}</strong></span>
+        <span style="font-size:12px;color:#64748b">Tanggal: <strong style="color:#334155">${siswa.tanggalAsesmen}</strong></span>
+        ${showKelas && siswa.kelasNama?`<span style="font-size:12px;color:#3b82f6;font-weight:700">Kelas: ${siswa.kelasNama}</span>`:""}
+      </div>
+    </div>
+  </div>
 // ══════════════════════════════════════════
 // APP ROOT
 // ══════════════════════════════════════════
@@ -2514,10 +2589,20 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
   const [showAdd,setShowAdd]=useState(false);
   const [newK,setNewK]=useState({nama:"",bidang:"sains",kapasitas:30,wali:"",mapel:[],jenjang:"sma_x"});
   const [expandMapel,setExpandMapel]=useState({});
+  const [exportKelasId,setExportKelasId]=useState("__semua__");
   const totalKap=kelas.reduce((s,k)=>s+k.kapasitas,0);
   const totalTerisi=daftar.filter(s=>s.kelasId).length;
   const belum=daftar.filter(s=>!s.kelasId).length;
   const tMin=target?.min||0; const tMax=target?.max||totalKap;
+
+  function handleDownload() {
+    if (exportKelasId === "__semua__") {
+      doExcelExportPerKelas(daftar, kelas);
+    } else {
+      const k = kelas.find(x => x.id === exportKelasId);
+      if (k) doExcelExportPerKelas(daftar, [k]);
+    }
+  }
 
   // Kelompokkan kelas per jenjang
   const kelasByJenjang = JENJANG_LIST.reduce((acc, j) => {
@@ -2557,6 +2642,28 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
             </button>
           )}
           <button style={S.cta} onClick={()=>setShowAdd(!showAdd)}>+ Tambah Kelas</button>
+          {totalTerisi > 0 && (
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <select
+                value={exportKelasId}
+                onChange={e=>setExportKelasId(e.target.value)}
+                style={{...S.inp,padding:"7px 10px",fontSize:13,minWidth:120,cursor:"pointer"}}
+              >
+                <option value="__semua__">Semua Kelas</option>
+                {kelas.map(k=>(
+                  <option key={k.id} value={k.id}>
+                    {k.nama} ({daftar.filter(s=>s.kelasId===k.id).length} siswa)
+                  </option>
+                ))}
+              </select>
+              <button
+                style={{...S.ghost,padding:"7px 13px",fontSize:13,display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}
+                onClick={handleDownload}
+              >
+                📥 Download
+              </button>
+            </div>
+          )}
         </div>
       </div>
       <div style={{background:"#0F172A",border:"1px solid #1E293B",borderRadius:14,padding:16}}>
@@ -2715,7 +2822,7 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,i
     const mc=fCat==="all"||s.top[0]?.id===fCat;
     const mk=fKelas==="all"||(fKelas==="none"?!s.kelasId:s.kelasId===fKelas);
     return ms&&mc&&mk;
-  }).sort((a,b)=>(b.top?.[0]?.pct??0)-(a.top?.[0]?.pct??0));
+  });
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
