@@ -945,7 +945,7 @@ export default function App() {
   }
 
   async function handleBulkAssign() {
-    if (!window.confirm(`Proses penempatan kelas untuk ${daftar.filter(s=>!s.kelasId).length} siswa yang belum ditempatkan?\n\nSiswa akan diranking berdasarkan kesesuaian bakat dengan mapel kelas.`)) return;
+    if (!window.confirm("Proses penempatan kelas untuk " + daftar.filter(s=>!s.kelasId).length + " siswa yang belum ditempatkan?\nSiswa akan diranking berdasarkan kesesuaian bakat dengan mapel kelas.")) return;
     setDbLoading(true);
     try {
       const hasilAssign = bulkAssign(daftar, kelas);
@@ -1839,7 +1839,7 @@ function KelolAdmin({ auth }) {
   }
 
   async function handleHapus(adminId, nama) {
-    if (!window.confirm(`Hapus admin "${nama}"?`)) return;
+    if (!window.confirm("Hapus admin \"" + nama + "\"?")) return;
     setLoading(true);
     try {
       await hapusAdmin(adminId, auth.school_id);
