@@ -282,13 +282,20 @@ export async function fetchTarget(schoolId) {
   return { min: data.min, max: data.max };
 }
 
-export async function saveTarget(min, max, schoolId) {
+export async function saveTarget(min, max, schoolId, perJenjang) {
+  const row = {
+    min, max,
+    school_id: schoolId,
+    updated_at: new Date().toISOString(),
+  };
+  if (perJenjang) {
+    if (perJenjang.smp)    { row.smp_min    = perJenjang.smp.min    ?? null; row.smp_max    = perJenjang.smp.max    ?? null; }
+    if (perJenjang.sma_x)  { row.sma_x_min  = perJenjang.sma_x.min  ?? null; row.sma_x_max  = perJenjang.sma_x.max  ?? null; }
+    if (perJenjang.sma_xi) { row.sma_xi_min = perJenjang.sma_xi.min ?? null; row.sma_xi_max = perJenjang.sma_xi.max ?? null; }
+  }
   const { error } = await supabase
     .from("target_penerimaan")
-    .upsert(
-      { min, max, school_id: schoolId, updated_at: new Date().toISOString() },
-      { onConflict: "school_id" }
-    );
+    .upsert(row, { onConflict: "school_id" });
   if (error) throw error;
 }
 
