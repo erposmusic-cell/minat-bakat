@@ -283,17 +283,13 @@ export async function fetchTarget(schoolId) {
 }
 
 export async function saveTarget(min, max, schoolId) {
-  const { data: existing } = await supabase
-    .from("target_penerimaan").select("id").eq("school_id", schoolId).maybeSingle();
-  if (existing) {
-    const { error } = await supabase.from("target_penerimaan")
-      .update({ min, max, updated_at: new Date().toISOString() }).eq("id", existing.id);
-    if (error) throw error;
-  } else {
-    const { error } = await supabase.from("target_penerimaan")
-      .insert({ min, max, school_id: schoolId, updated_at: new Date().toISOString() });
-    if (error) throw error;
-  }
+  const { error } = await supabase
+    .from("target_penerimaan")
+    .upsert(
+      { min, max, school_id: schoolId, updated_at: new Date().toISOString() },
+      { onConflict: "school_id" }
+    );
+  if (error) throw error;
 }
 
 // ══════════════════════════════════════════
