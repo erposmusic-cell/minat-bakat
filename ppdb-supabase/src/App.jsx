@@ -576,7 +576,7 @@ function generateNarasi(nama, scores, top) {
   const kombiKey = [t0.id, t1.id].sort().join("-");
   const p2base = NARASI_DB.p2_kombinasi[kombiKey] || `${nama} memiliki kombinasi bakat yang unik antara ${t0.label} dan ${t1.label}.`;
   const p2 = `${p2base} Distribusi skor: ${t0.label} (${t0.pct}%), ${t1.label} (${t1.pct}%), ${t2.label} (${t2.pct}%).`;
-  const j = (getJurusan("sma_x")[t0.id]) || [];
+  const j = (getJurusan(top[0]?.jenjang || "sma_x")[t0.id]) || [];
   const p3fn = NARASI_DB.p3[t0.id];
   const p3 = p3fn ? p3fn(nama, j[0]||"-", j[1]||"-", j[2]||"-", t0.pct) : `${nama} disarankan untuk mendalami bidang-bidang yang selaras dengan kekuatan utamanya.`;
   return `${p1}\n\n${p2}\n\n${p3}`;
@@ -856,7 +856,7 @@ export default function App() {
     const kelasId      = null;
     const kelasNama    = null;
     const kelasOverflow = false;
-    const narasi    = generateNarasi(formSiswa.nama, scores, top);
+    const narasi    = generateNarasi(formSiswa.nama, scores, top.map(t => ({...t, jenjang: formSiswa.jenjang || jenjang})));
     const gbScores  = calcGayaBelajar(gbAnswers);
     const [topGbId, topGbPct] = getTopGayaBelajar(gbScores);
     const topGbCat  = GAYA_BELAJAR_CAT.find(c => c.id === topGbId);
@@ -923,11 +923,11 @@ export default function App() {
     setDbLoading(false);
   }
 
-  async function handleSaveTarget(min, max) {
+  async function handleSaveTarget(min, max, perJenjang) {
     setDbLoading(true);
     try {
-      await saveTarget(min, max, auth.school_id);
-      setTarget({min, max});
+      await saveTarget(min, max, auth.school_id, perJenjang);
+      setTarget({ min, max, perJenjang: perJenjang || target.perJenjang });
     } catch(e) { setDbError("Gagal simpan target: " + e.message); }
     setDbLoading(false);
   }
