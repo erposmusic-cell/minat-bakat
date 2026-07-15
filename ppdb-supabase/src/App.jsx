@@ -291,11 +291,11 @@ const SCALE = [
 // ══════════════════════════════════════════
 // UTILS
 // ══════════════════════════════════════════
-function calcScores(ans) {
+function calcScores(ans, questionSet = QUESTIONS) {
   const scores = {}; const counts = {};
   CAT.forEach(c => { scores[c.id]=0; counts[c.id]=0; });
-  QUESTIONS.forEach(q => { counts[q.cat]++; if(ans[q.id]) scores[q.cat]+=ans[q.id]; });
-  CAT.forEach(c => { scores[c.id]=Math.round((scores[c.id]/(5*counts[c.id]))*100); });
+  questionSet.forEach(q => { counts[q.cat]++; if(ans[q.id]) scores[q.cat]+=ans[q.id]; });
+  CAT.forEach(c => { scores[c.id] = counts[c.id]>0 ? Math.round((scores[c.id]/(5*counts[c.id]))*100) : 0; });
   return scores;
 }
 
@@ -889,7 +889,8 @@ export default function App() {
       alert(`❌ Kuota siswa paket Anda sudah penuh (${maksSiswa} siswa).\nHubungi admin untuk upgrade paket.`);
       return;
     }
-    const scores    = calcScores(answers);
+    const questionSetUsed = shuffled.length > 0 ? shuffled : QUESTIONS; // set soal yang benar-benar ditampilkan (termasuk soal manual)
+    const scores    = calcScores(answers, questionSetUsed);
     const top       = getTop(scores);
     // ── Deteksi kualitas pengisian (anti asal-jawab) ──────
     const totalSoal   = (shuffled.length || QUESTIONS.length) + (gbShuffled.length || GAYA_BELAJAR_QUESTIONS.length);
