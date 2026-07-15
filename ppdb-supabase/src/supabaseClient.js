@@ -266,8 +266,8 @@ export async function upsertKelas(kelasArr, schoolId) {
   if (error) throw error;
 }
 
-export async function deleteKelas(id) {
-  const { error } = await supabase.from("kelas").delete().eq("id", id);
+export async function deleteKelas(id, schoolId) {
+  const { error } = await supabase.from("kelas").delete().eq("id", id).eq("school_id", schoolId);
   if (error) throw error;
 }
 
@@ -335,14 +335,14 @@ export async function insertSiswa(siswa, schoolId) {
   if (error) throw error;
 }
 
-export async function updateKelasSiswa(siswaId, kelasId, kelasNama) {
+export async function updateKelasSiswa(siswaId, kelasId, kelasNama, schoolId) {
   const { error } = await supabase.from("siswa")
-    .update({ kelas_id: kelasId, kelas_nama: kelasNama }).eq("id", siswaId);
+    .update({ kelas_id: kelasId, kelas_nama: kelasNama }).eq("id", siswaId).eq("school_id", schoolId);
   if (error) throw error;
 }
 
-export async function deleteSiswa(id) {
-  const { error } = await supabase.from("siswa").delete().eq("id", id);
+export async function deleteSiswa(id, schoolId) {
+  const { error } = await supabase.from("siswa").delete().eq("id", id).eq("school_id", schoolId);
   if (error) throw error;
 }
 
@@ -396,6 +396,7 @@ function dbRowToSiswa(row) {
     top: Array.isArray(row.top_bakat) && row.top_bakat.length > 0
       ? row.top_bakat
       : [{ id:"logika", pct:0, label:"Belum Ada", icon:"❓", color:"#94A3B8" }],
+    kualitasData: row.kualitas_data || null, // ← durasi & deteksi straight-lining
   };
 }
 
@@ -409,6 +410,7 @@ function siswaToDbRow(s) {
     skor_sains: s.scores.sains, skor_seni: s.scores.seni,
     skor_sosial: s.scores.sosial, skor_olahraga: s.scores.olahraga,
     top_bakat: s.top,
+    kualitas_data: s.kualitasData || null, // ← durasi & deteksi straight-lining
   };
 }
 
