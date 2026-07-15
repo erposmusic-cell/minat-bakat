@@ -139,7 +139,7 @@ export default function LoginPage({ onLogin }) {
       <div style={S.card}>
         <div style={{ textAlign:"center", marginBottom:22 }}>
           <div style={{ fontSize:42, color:"#3B82F6", cursor:"pointer", userSelect:"none" }} onClick={handleLogoClick}>◈</div>
-          <h1 style={S.title}>PPDB Asesmen Bakat & Minat</h1>
+          <h1 style={S.title}>Asesmen Bakat & Minat</h1>
           <p style={S.sub}>Sistem Penjurusan Cerdas — SMA 2025/2026</p>
         </div>
 
