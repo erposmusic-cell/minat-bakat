@@ -92,6 +92,18 @@ const DEFAULT_KELAS = [
   { id:"k4", nama:"X-D", bidang:"bahasa",   kapasitas:30, wali:"", jenjang:"sma_x" },
 ];
 
+// ID kelas HARUS unik di seluruh database (kolom `id` adalah primary key global,
+// bukan per-sekolah). Jangan pernah pakai id statis seperti "k1"-"k4" langsung —
+// selalu generate ulang lewat fungsi ini agar tidak bentrok dengan sekolah lain.
+function genKelasId() {
+  return "k_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+}
+// Salinan kelas default dengan id baru yang unik — dipanggil setiap kali sekolah
+// baru pertama kali setup (bukan referensi array statis yang sama untuk semua sekolah).
+function freshDefaultKelas() {
+  return DEFAULT_KELAS.map(k => ({ ...k, id: genKelasId() }));
+}
+
 const CAT = [
   { id:"logika",   label:"Logika & Analitik",     icon:"🧮", color:"#3B82F6" },
   { id:"bahasa",   label:"Bahasa & Sastra",        icon:"📚", color:"#10B981" },
@@ -292,6 +304,44 @@ function getTop(scores) {
     .sort((a,b)=>b[1]-a[1])
     .slice(0,3)
     .map(([id,pct])=>({id,pct,...CAT.find(c=>c.id===id)}));
+}
+
+// ══════════════════════════════════════════
+// DETEKSI KUALITAS DATA (ANTI-ASAL JAWAB)
+// ══════════════════════════════════════════
+// Deteksi pola jawaban seragam / asal pilih (straight-lining).
+// Menggabungkan 2 sinyal: (1) proporsi nilai yang paling sering dipilih,
+// (2) variasi (standar deviasi) seluruh jawaban. Keduanya rendah → pola seragam.
+function detectStraightLining(ans) {
+  const vals = Object.values(ans).filter(v => typeof v === "number" && !isNaN(v));
+  const total = vals.length;
+  if (total < 10) return { flagged:false, level:"aman", modePct:0, modeVal:null, stdDev:0, total };
+
+  const freq = {};
+  vals.forEach(v => { freq[v] = (freq[v]||0) + 1; });
+  const [modeVal, modeCount] = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0];
+  const modePct = Math.round((modeCount / total) * 100);
+
+  const mean = vals.reduce((a,b)=>a+b,0) / total;
+  const variance = vals.reduce((a,b)=>a+Math.pow(b-mean,2),0) / total;
+  const stdDev = +Math.sqrt(variance).toFixed(2);
+
+  let level = "aman";
+  if (modePct >= 90 || stdDev <= 0.25) level = "sangat_mencurigakan";
+  else if (modePct >= 75 || stdDev <= 0.5) level = "perlu_ditinjau";
+
+  return { flagged: level !== "aman", level, modePct, modeVal: Number(modeVal), stdDev, total };
+}
+
+// Deteksi waktu pengerjaan yang tidak wajar (terlalu cepat untuk dibaca & dijawab jujur).
+// Ambang batas: rata-rata < 1.5 detik/soal → sangat mencurigakan, < 3 detik/soal → perlu ditinjau.
+function detectWaktuTerlaluCepat(durasiDetik, totalSoal) {
+  if (!durasiDetik || !totalSoal) return { flagged:false, level:"aman", rataRata:null };
+  const rataRata = +(durasiDetik / totalSoal).toFixed(1);
+  let level = "aman";
+  if (rataRata < 1.5) level = "sangat_mencurigakan";
+  else if (rataRata < 3) level = "perlu_ditinjau";
+  return { flagged: level !== "aman", level, rataRata };
 }
 
 
@@ -747,7 +797,7 @@ export default function App() {
   const [animIn, setAnimIn]       = useState(true);
   const [daftar, setDaftar]       = useState([]);
   const [viewSiswa, setViewSiswa] = useState(null);
-  const [kelas, setKelas]         = useState(DEFAULT_KELAS);
+  const [kelas, setKelas]         = useState(freshDefaultKelas);
   const [target, setTarget]       = useState(DEFAULT_TARGET);
   const [jenjang, setJenjang]     = useState("sma_x"); // jenjang sekolah
   const [setupDone, setSetupDone] = useState(false);
@@ -759,6 +809,7 @@ export default function App() {
   const [siswaSchool, setSiswaSchool] = useState(null);
   const [logoSekolah, setLogoSekolah] = useState(null); // base64 logo
   const [tahunAjaran, setTahunAjaran] = useState(null); // e.g. '2025/2026'
+  const waktuMulaiRef = useRef(null); // timestamp mulai asesmen (untuk deteksi waktu terlalu cepat)
 
   // Wrapper setPhase & setTab yang sekaligus update URL
   function setPhase(p, t) {
@@ -797,7 +848,7 @@ export default function App() {
         getLogoSekolah(sid),
         getTahunAjaran(sid),
       ]);
-      setKelas(kelasData.length > 0 ? kelasData : DEFAULT_KELAS);
+      setKelas(kelasData.length > 0 ? kelasData : freshDefaultKelas());
       setTarget(targetData);
       setDaftar(siswaData);
       setQuestions(soalData.length > 0 ? soalData : QUESTIONS);
@@ -840,6 +891,12 @@ export default function App() {
     }
     const scores    = calcScores(answers);
     const top       = getTop(scores);
+    // ── Deteksi kualitas pengisian (anti asal-jawab) ──────
+    const totalSoal   = (shuffled.length || QUESTIONS.length) + (gbShuffled.length || GAYA_BELAJAR_QUESTIONS.length);
+    const durasiDetik = waktuMulaiRef.current ? Math.round((Date.now() - waktuMulaiRef.current) / 1000) : null;
+    const straightLining = detectStraightLining({ ...answers, ...gbAnswers });
+    const terlaluCepat   = detectWaktuTerlaluCepat(durasiDetik, totalSoal);
+    const kualitasData = { durasiDetik, totalSoal, straightLining, terlaluCepat };
     // Fetch kelas & siswa fresh dari Supabase agar autoAssign pakai data terkini
     const schoolId  = auth?.school_id || siswaSchool?.id || null;
     let kelasLive   = kelas;
@@ -866,6 +923,7 @@ export default function App() {
       tanggalAsesmen: new Date().toLocaleDateString("id-ID", { dateStyle: "long" }),
       narasi,
       jenjang: formSiswa.jenjang || jenjang,
+      kualitasData,
       gayaBelajar: {
         scores: gbScores,
         dominan: topGbId,
@@ -900,7 +958,7 @@ export default function App() {
     try {
       const hasilAssign = bulkAssign(daftar, kelas);
       // Update ke Supabase satu per satu
-      await Promise.all(hasilAssign.map(h => updateKelasSiswa(h.siswaId, h.kelasId, h.kelasNama)));
+      await Promise.all(hasilAssign.map(h => updateKelasSiswa(h.siswaId, h.kelasId, h.kelasNama, auth.school_id)));
       // Update state lokal
       setDaftar(prev => prev.map(s => {
         const h = hasilAssign.find(x => x.siswaId === s.id);
@@ -935,7 +993,7 @@ export default function App() {
   async function handleDeleteKelas(kid) {
     setDbLoading(true);
     try {
-      await deleteKelas(kid);
+      await deleteKelas(kid, auth.school_id);
       setKelas(prev=>prev.filter(k=>k.id!==kid));
       setDaftar(prev=>prev.map(s=>s.kelasId===kid?{...s,kelasId:null,kelasNama:null}:s));
     } catch(e) { setDbError("Gagal hapus kelas: " + e.message); }
@@ -944,7 +1002,7 @@ export default function App() {
 
   async function handleUpdateKelasSiswa(siswaId, kelasId, kelasNama) {
     setDaftar(prev=>prev.map(s=>s.id===siswaId?{...s,kelasId,kelasNama}:s));
-    try { await updateKelasSiswa(siswaId, kelasId, kelasNama); }
+    try { await updateKelasSiswa(siswaId, kelasId, kelasNama, auth.school_id); }
     catch(e) { console.error("Gagal update kelas siswa:", e.message); }
   }
 
@@ -1025,6 +1083,7 @@ export default function App() {
           const q = questions.length > 0 ? questions : QUESTIONS;
           setShuffled([...q].sort(() => Math.random() - 0.5));
           setGbShuffled([...GAYA_BELAJAR_QUESTIONS].sort(() => Math.random() - 0.5));
+          waktuMulaiRef.current = Date.now();
           setPhase("asesmen");
         }} />}
         {phase === "asesmen" && asesPhase === "bakat" && (
@@ -1110,7 +1169,7 @@ function Topbar({auth,phase,setPhase,setAuth,daftar,tab,setTab,questions}) {
           <span style={{fontSize:26,color:"#3B82F6"}}>◈</span>
           <div>
             <div style={{fontWeight:800,fontSize:14}}>ASESMEN BAKAT & MINAT</div>
-            <div style={{fontSize:11,color:"#475569"}}>Sistem PPDB SMA 2025/2026</div>
+            <div style={{fontSize:11,color:"#475569"}}>Sistem Asesmen SMA 2025/2026</div>
           </div>
         </div>
         <div className="nav-btns">
@@ -1213,7 +1272,7 @@ function SetupWizard({kelas,target,jenjang,maksSiswa,onSaveKelas,onSaveTarget,on
       alert(`❌ Total kapasitas kelas sudah mencapai batas paket (${maksSiswa} siswa).`);
       return;
     }
-    setLk(prev=>[...prev,{id:"k"+Date.now(),nama:"",bidang:"sains",kapasitas:Math.min(30, maksSiswa?maksSiswa-totalKap:30),wali:"",jenjang:lj}]);
+    setLk(prev=>[...prev,{id:genKelasId(),nama:"",bidang:"sains",kapasitas:Math.min(30, maksSiswa?maksSiswa-totalKap:30),wali:"",jenjang:lj}]);
   }
   function delK(i){ if(lk.length>1) setLk(prev=>prev.filter((_,idx)=>idx!==i)); }
 
@@ -1351,7 +1410,7 @@ function SetupWizard({kelas,target,jenjang,maksSiswa,onSaveKelas,onSaveTarget,on
                     <span style={{fontSize:11,color:"#334155",marginLeft:"auto"}}>{kelasjList.length} kelas</span>
                     <button
                       style={{...S.ghost,padding:"3px 10px",fontSize:11,marginLeft:8}}
-                      onClick={()=>setLk(prev=>[...prev,{id:"k"+Date.now(),nama:"",bidang:"sains",kapasitas:30,wali:"",jenjang:j.id}])}
+                      onClick={()=>setLk(prev=>[...prev,{id:genKelasId(),nama:"",bidang:"sains",kapasitas:30,wali:"",jenjang:j.id}])}
                     >+ Tambah ke {j.label.split(" ")[0]}</button>
                   </div>
                   {kelasjList.length===0 && (
@@ -1980,6 +2039,45 @@ function Hasil({siswa,onBaru,onDaftar,auth,logoSekolah,tahunAjaran,kelasList}) {
         <h2 style={{fontSize:28,fontWeight:900,margin:"10px 0 4px",color:"#E2E8F0"}}>{siswa.nama}</h2>
         <p style={{color:"#475569",fontSize:13,margin:0}}>{siswa.nisn} · {siswa.sekolah} · {siswa.tanggalAsesmen}</p>
       </div>
+      {auth?.role==="panitia" && siswa.kualitasData && (() => {
+        const { durasiDetik, totalSoal, straightLining, terlaluCepat } = siswa.kualitasData;
+        const adaMasalah = straightLining?.flagged || terlaluCepat?.flagged;
+        if (!adaMasalah && durasiDetik == null) return null;
+        const warnaLevel = lvl => lvl==="sangat_mencurigakan" ? "#EF4444" : lvl==="perlu_ditinjau" ? "#F59E0B" : "#10B981";
+        const menit = durasiDetik != null ? Math.floor(durasiDetik/60) : null;
+        const detik = durasiDetik != null ? durasiDetik%60 : null;
+        return (
+          <div style={{background: adaMasalah?"#EF444410":"#0F172A", border:"1px solid "+(adaMasalah?"#EF444455":"#1E293B"), borderRadius:16, padding:"16px 20px"}}>
+            <h3 style={{...S.cardTitle, color: adaMasalah?"#EF4444":"#94A3B8"}}>{adaMasalah?"⚠️":"🔎"} Validitas Pengisian <span style={{fontSize:11,fontWeight:400,color:"#64748B"}}>(hanya terlihat oleh panitia)</span></h3>
+            <div style={{display:"flex",gap:20,flexWrap:"wrap",marginTop:10}}>
+              {durasiDetik != null && (
+                <div>
+                  <div style={{fontSize:10,color:"#64748B",marginBottom:2}}>DURASI PENGERJAAN</div>
+                  <div style={{fontSize:16,fontWeight:800,color: warnaLevel(terlaluCepat?.level)}}>
+                    {menit>0?`${menit} menit `:""}{detik} detik {totalSoal?`(${(durasiDetik/totalSoal).toFixed(1)} dtk/soal)`:""}
+                  </div>
+                  {terlaluCepat?.flagged && (
+                    <div style={{fontSize:11,color:warnaLevel(terlaluCepat.level),marginTop:2}}>
+                      {terlaluCepat.level==="sangat_mencurigakan"?"Sangat cepat — kemungkinan asal klik":"Tergolong cepat — perlu ditinjau"}
+                    </div>
+                  )}
+                </div>
+              )}
+              <div>
+                <div style={{fontSize:10,color:"#64748B",marginBottom:2}}>POLA JAWABAN</div>
+                <div style={{fontSize:16,fontWeight:800,color: warnaLevel(straightLining?.level)}}>
+                  {straightLining?.modePct}% jawaban bernilai sama
+                </div>
+                {straightLining?.flagged && (
+                  <div style={{fontSize:11,color:warnaLevel(straightLining.level),marginTop:2}}>
+                    {straightLining.level==="sangat_mencurigakan"?"Sangat seragam — indikasi straight-lining":"Kurang bervariasi — perlu ditinjau"} (SD={straightLining.stdDev})
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {siswa.kelasNama && auth?.role==="panitia" &&(
         <div style={{background:siswa.kelasOverflow?"#F59E0B15":t0.color+"15",border:"2px solid "+(siswa.kelasOverflow?"#F59E0B88":t0.color+"55"),borderRadius:16,padding:"16px 22px",display:"flex",flexDirection:"column",gap:10}}>
           {siswa.kelasOverflow&&(
@@ -2145,7 +2243,7 @@ function KodeBanner({kode, namaSekolah}) {
 // ══════════════════════════════════════════
 function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,maksSiswa,onDetail,onBaru,onExport,onSetupUlang,onSaveKelas,onDeleteKelas,onUpdateKelasSiswa,onRefresh,onBulkAssign,dbLoading,logoSekolah,onSaveLogo,tahunAjaran,onSaveTahun}) {
   const isUtama = auth?.role_admin === "admin_utama";
-  if(tab==="data")  return <DaftarSiswa daftar={daftar} kelas={kelas} onDetail={onDetail} onBaru={onBaru} onExport={onExport} onUpdateKelasSiswa={onUpdateKelasSiswa} isUtama={isUtama} logoSekolah={logoSekolah} tahunAjaran={tahunAjaran} auth={auth} maksSiswa={maksSiswa}/>;
+  if(tab==="data")  return <DaftarSiswa daftar={daftar} setDaftar={setDaftar} kelas={kelas} onDetail={onDetail} onBaru={onBaru} onExport={onExport} onUpdateKelasSiswa={onUpdateKelasSiswa} isUtama={isUtama} logoSekolah={logoSekolah} tahunAjaran={tahunAjaran} auth={auth} maksSiswa={maksSiswa}/>;
   if(tab==="soal")  return (
     <ManajemenSoal
       soal={questions}
@@ -2396,7 +2494,12 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,maks
                 const t=s.top[0]; const k=kelas.find(x=>x.id===s.kelasId);
                 return (
                   <tr key={s.id} style={S.tr}>
-                    <td style={{...S.td,fontWeight:600,color:"#E2E8F0"}}>{s.nama}</td>
+                    <td style={{...S.td,fontWeight:600,color:"#E2E8F0"}}>
+                      {s.nama}
+                      {(s.kualitasData?.straightLining?.flagged || s.kualitasData?.terlaluCepat?.flagged) && (
+                        <span title="Perlu ditinjau: pola jawaban/waktu pengerjaan mencurigakan" style={{marginLeft:6,fontSize:12,cursor:"help"}}>⚠️</span>
+                      )}
+                    </td>
                     <td style={S.td}>{s.nisn}</td>
                     <td style={S.td}><span style={{border:"1px solid "+t.color+"66",color:t.color,borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:600}}>{t.icon} {t.label}</span></td>
                     <td style={{...S.td,color:"#60A5FA"}}>{k?.nama||"-"}</td>
@@ -2426,15 +2529,37 @@ function Dashboard({daftar,setDaftar,kelas,target,tab,setTab,questions,auth,maks
 // Komponen input mata pelajaran per kelas
 // ── Daftar mapel pilihan sekolah (sesuai konfigurasi kelas XI) ──
 const MAPEL_OPTIONS = [
+  // ── Matematika & IPA ──
   { id: "mat_lanjut",  label: "Matematika Lanjut" },
   { id: "matematika",  label: "Matematika" },
   { id: "fisika",      label: "Fisika" },
   { id: "biologi",     label: "Biologi" },
+  { id: "kimia",       label: "Kimia" },
+  // ── IPS ──
   { id: "sosiologi",   label: "Sosiologi" },
-  { id: "bing_l",      label: "Bahasa Inggris Lanjutan" },
-  { id: "informatika", label: "Informatika" },
-  { id: "jerman",      label: "Bahasa Jerman" },
+  { id: "ekonomi",     label: "Ekonomi" },
   { id: "geografi",    label: "Geografi" },
+  { id: "sejarah",     label: "Sejarah" },
+  { id: "antropologi", label: "Antropologi" },
+  // ── Bahasa ──
+  { id: "bindo_l",     label: "Bahasa Indonesia Lanjutan" },
+  { id: "bing_l",      label: "Bahasa Inggris Lanjutan" },
+  { id: "arab",        label: "Bahasa Arab" },
+  { id: "jerman",      label: "Bahasa Jerman" },
+  { id: "prancis",     label: "Bahasa Prancis" },
+  { id: "mandarin",    label: "Bahasa Mandarin" },
+  { id: "jepang",      label: "Bahasa Jepang" },
+  { id: "korea",       label: "Bahasa Korea" },
+  // ── Vokasi / Prakarya & Kewirausahaan ──
+  { id: "prakarya",    label: "Prakarya dan Kewirausahaan" },
+  // ── Seni Budaya ──
+  { id: "seni_musik",  label: "Seni Musik" },
+  { id: "seni_rupa",   label: "Seni Rupa" },
+  { id: "seni_tari",   label: "Seni Tari" },
+  { id: "seni_teater", label: "Seni Teater" },
+  // ── Informatika & Olahraga ──
+  { id: "informatika", label: "Informatika" },
+  { id: "pjok",        label: "PJOK" },
 ];
 
 function MapelEditor({ mapel, onChange }) {
@@ -2554,7 +2679,7 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
 
   async function save(){ const updated=kelas.map(k=>k.id===editId?{...k,...form,kapasitas:parseInt(form.kapasitas)||30}:k); await onSaveKelas(updated); setEditId(null); }
   async function del(kid){ if(!window.confirm("Hapus kelas?"))return; await onDeleteKelas(kid); setDaftar(prev=>prev.map(s=>s.kelasId===kid?{...s,kelasId:null,kelasNama:null}:s)); }
-  async function add(){ const newKelas=[...kelas,{...newK,id:"k"+Date.now(),kapasitas:parseInt(newK.kapasitas)||30}]; await onSaveKelas(newKelas); setNewK({nama:"",bidang:"sains",kapasitas:30,wali:"",mapel:[],jenjang:"sma_x"}); setShowAdd(false); }
+  async function add(){ const newKelas=[...kelas,{...newK,id:genKelasId(),kapasitas:parseInt(newK.kapasitas)||30}]; await onSaveKelas(newKelas); setNewK({nama:"",bidang:"sains",kapasitas:30,wali:"",mapel:[],jenjang:"sma_x"}); setShowAdd(false); }
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
@@ -2756,7 +2881,7 @@ function ManajemenKelas({kelas,daftar,setDaftar,target,onSaveKelas,onDeleteKelas
 // ══════════════════════════════════════════
 // DAFTAR SISWA
 // ══════════════════════════════════════════
-function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,isUtama,logoSekolah,tahunAjaran,auth,maksSiswa}) {
+function DaftarSiswa({daftar,setDaftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,isUtama,logoSekolah,tahunAjaran,auth,maksSiswa}) {
   const kuotaPenuh = maksSiswa !== null && daftar.length >= maksSiswa;
   const [search,setSearch]=useState("");
   const [fCat,setFCat]=useState("all");
@@ -2802,7 +2927,18 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,i
                 return (
                   <tr key={s.id} style={S.tr}>
                     <td style={S.td}>{i+1}</td>
-                    <td style={{...S.td,fontWeight:600,color:"#E2E8F0"}}>{s.nama}</td>
+                    <td style={{...S.td,fontWeight:600,color:"#E2E8F0"}}>
+                      {s.nama}
+                      {(s.kualitasData?.straightLining?.flagged || s.kualitasData?.terlaluCepat?.flagged) && (
+                        <span
+                          title={[
+                            s.kualitasData?.terlaluCepat?.flagged ? "Waktu pengerjaan terlalu cepat" : null,
+                            s.kualitasData?.straightLining?.flagged ? "Pola jawaban seragam (straight-lining)" : null,
+                          ].filter(Boolean).join(" · ")}
+                          style={{marginLeft:6,fontSize:12,cursor:"help"}}
+                        >⚠️</span>
+                      )}
+                    </td>
                     <td style={S.td}>{s.nisn}</td>
                     <td style={S.td}>{s.sekolah}</td>
                     <td style={S.td}><span style={{border:"1px solid "+t.color+"66",color:t.color,borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:600,display:"inline-block"}}>{t.icon} {t.label}</span></td>
@@ -2845,7 +2981,7 @@ function DaftarSiswa({daftar,kelas,onDetail,onBaru,onExport,onUpdateKelasSiswa,i
                         <button style={{...S.detBtn,color:"#10B981",borderColor:"#10B98155"}} onClick={()=>doPrintSiswa(s, logoSekolah, auth?.namaSekolah, tahunAjaran, true)}>PDF</button>
                         {isUtama && (
                           <button style={{...S.detBtn,color:"#EF4444",borderColor:"#EF444433"}}
-                            onClick={async()=>{ if(!window.confirm("Hapus siswa ini?"))return; await deleteSiswa(s.id); setDaftar(p=>p.filter(x=>x.id!==s.id)); }}>🗑</button>
+                            onClick={async()=>{ if(!window.confirm("Hapus siswa ini?"))return; await deleteSiswa(s.id, auth?.school_id); setDaftar(p=>p.filter(x=>x.id!==s.id)); }}>🗑</button>
                         )}
                       </div>
                     </td>
